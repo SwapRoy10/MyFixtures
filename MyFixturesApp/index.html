@@ -26,6 +26,9 @@
     .team-mini-crest { width: 28px; height: 28px; object-fit: contain; }
     .saved-heading { margin: 20px 0 8px; font: 11px 'DM Mono', monospace; color: var(--muted); text-transform: uppercase; }
     .club-switcher .button { white-space: nowrap; }
+    .sport-select { border: 1px solid var(--line); background: #fff; color: var(--ink); padding: 10px 12px; margin-bottom: 14px; min-width: 180px; }
+    .team-initials { display: inline-grid; place-items: center; width: 30px; height: 30px; background: var(--ink); color: #fff; font: 11px 'DM Mono', monospace; vertical-align: middle; margin-right: 9px; }
+    .team-mini-initials { display: inline-grid; place-items: center; width: 28px; height: 28px; background: var(--ink); color: #fff; font: 10px 'DM Mono', monospace; }
     @media (max-width: 700px) { .club-switcher { min-width: 0; } }
   </style>
 </head>
@@ -46,8 +49,9 @@
 
     <section class="controls" aria-label="Fixture controls">
       <div>
-        <p class="section-label">Selected club</p>
-        <button class="club-select" id="club-select" type="button"><img class="club-mark" id="club-mark" src="https://crests.football-data.org/57.png" alt="Arsenal crest"> <span id="club-name">Arsenal</span> <span class="chevron">⌄</span></button>
+        <p class="section-label">Selected team</p>
+        <select class="sport-select" id="sport-select" aria-label="Choose sport"><option value="soccer">Soccer</option><option value="nfl">NFL</option></select><br>
+        <button class="club-select" id="club-select" type="button"><span id="team-mark-wrapper"><img class="club-mark" id="club-mark" src="https://crests.football-data.org/57.png" alt="Arsenal crest"></span> <span id="club-name">Arsenal</span> <span class="chevron">⌄</span></button>
       </div>
       <div class="control-actions">
         <button id="add-fixture" class="button button-outline" type="button"><span>＋</span> Add fixture</button>
@@ -81,7 +85,7 @@
   <dialog id="club-dialog" class="club-switcher">
     <form method="dialog" id="club-search-form">
       <button class="close-dialog" id="close-club-dialog" type="button" aria-label="Close">×</button>
-      <p class="eyebrow">Club list</p><h2>Choose a team</h2>
+      <p class="eyebrow">Team list</p><h2>Choose a team</h2>
       <div class="club-search"><input id="club-search-input" name="search" placeholder="Search teams" autocomplete="off"><button class="button button-solid" type="submit">Search</button></div>
       <div id="club-results" class="club-results"></div>
       <p class="saved-heading">Saved clubs</p><div id="saved-clubs" class="saved-clubs"></div>

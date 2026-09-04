@@ -23,7 +23,11 @@ const fixtures = [
   { date: '2027-05-30', time: '16:00', opponent: 'TBC', venue: 'TBC', competition: 'Season final', home: true }
 ];
 const fallbackFixtures = [...fixtures];
-let currentTeam = { id: 57, name: 'Arsenal' };
+let currentSport = localStorage.getItem('fixture-sport') || 'soccer';
+let currentTeam = JSON.parse(localStorage.getItem('fixture-current-team') || 'null') || { id: 57, sport: 'soccer', name: 'Arsenal', crest: 'https://crests.football-data.org/57.png' };
+if ((currentTeam.sport || 'soccer') !== currentSport) {
+  currentTeam = currentSport === 'nfl' ? { id: 18, sport: 'nfl', name: 'Philadelphia Eagles', abbreviation: 'PHI', crest: null } : { id: 57, sport: 'soccer', name: 'Arsenal', crest: 'https://crests.football-data.org/57.png' };
+}
 const list = document.querySelector('#fixture-list');
 const sourceNote = document.querySelector('#source-note');
 const timezoneLabelElement = document.querySelector('#timezone-label');
@@ -32,12 +36,25 @@ const clubResults = document.querySelector('#club-results');
 const savedClubs = document.querySelector('#saved-clubs');
 const clubSearchInput = document.querySelector('#club-search-input');
 const googleAllButton = document.querySelector('#google-all');
+const sportSelect = document.querySelector('#sport-select');
+const teamMarkWrapper = document.querySelector('#team-mark-wrapper');
 const googleClientId = '182131305802-0i417v1pr1tarbne0gofgqcvr2oqolfb.apps.googleusercontent.com';
 const calendarScope = 'https://www.googleapis.com/auth/calendar.events';
 let selectedTimeZone = localStorage.getItem('fixture-time-zone') || 'America/New_York';
 const timezoneSelect = document.querySelector('#timezone-select');
 timezoneSelect.value = selectedTimeZone;
+sportSelect.value = currentSport;
 function timezoneLabel() { return timezoneSelect.options[timezoneSelect.selectedIndex].text; }
+function sportLabel() { return currentSport === 'nfl' ? 'NFL' : 'Soccer'; }
+function teamInitials(team) { return (team.abbreviation || team.name || 'TM').split(/\s+/).map(part => part[0]).join('').slice(0, 3).toUpperCase(); }
+function teamMark(team, mini = false) {
+  if (team.crest) return `<img class="${mini ? 'team-mini-crest' : 'club-mark'}" src="${team.crest}" alt="${team.name} crest">`;
+  return `<span class="${mini ? 'team-mini-initials' : 'team-initials'}" aria-hidden="true">${teamInitials(team)}</span>`;
+}
+function setTeamHeader() {
+  document.querySelector('#club-name').textContent = currentTeam.name;
+  teamMarkWrapper.innerHTML = teamMark(currentTeam);
+}
 function convertWallTimeToUtc(dateValue, timeValue, timeZone) {
   const target = Date.parse(`${dateValue}T${timeValue}:00Z`);
   let guess = new Date(target);
@@ -73,24 +90,24 @@ function formatFixtureForSelectedZone(timestamp) {
 }
 async function loadLiveFixtures() {
   try {
-    const response = await fetch(`/api/fixtures?team=${currentTeam.id}&dateFrom=2026-08-01&dateTo=2027-05-30`);
+    const response = await fetch(`/api/fixtures?sport=${encodeURIComponent(currentSport)}&team=${currentTeam.id}&dateFrom=2026-08-01&dateTo=2027-05-30`);
     if (!response.ok) throw new Error(`Fixture API returned ${response.status}`);
     const payload = await response.json();
     const liveFixtures = payload.fixtures;
     if (!Array.isArray(liveFixtures) || liveFixtures.length === 0) throw new Error(`No live fixtures returned (${JSON.stringify(payload.errors || {})})`);
     fixtures.splice(0, fixtures.length, ...liveFixtures.map(item => {
+      if (item.utcDate && item.opponent) return { ...formatFixtureForSelectedZone(item.utcDate), ...item };
       const kickoff = formatFixtureForSelectedZone(item.utcDate);
       return { ...kickoff, utcDate: item.utcDate, opponent: item.homeTeam.id === currentTeam.id ? item.awayTeam.name : item.homeTeam.name, venue: item.venue || '', competition: item.competition.name, home: item.homeTeam.id === currentTeam.id };
     }));
-    document.querySelector('#club-name').textContent = currentTeam.name;
-    document.querySelector('#club-mark').src = currentTeam.crest || `https://crests.football-data.org/${currentTeam.id}.png`;
-    document.querySelector('#club-mark').alt = `${currentTeam.name} crest`;
-    sourceNote.innerHTML = `Live schedule from <a href="https://www.football-data.org/" target="_blank" rel="noreferrer">football-data.org</a>. Times converted to ${timezoneLabel()}. <a href="https://www.arsenal.com/fixtures/men/fixtures" target="_blank" rel="noreferrer">Check Arsenal.com</a> for late changes.`;
+    setTeamHeader();
+    const source = currentSport === 'nfl' ? '<a href="https://www.balldontlie.io/" target="_blank" rel="noreferrer">BALLDONTLIE</a>' : '<a href="https://www.football-data.org/" target="_blank" rel="noreferrer">football-data.org</a>';
+    sourceNote.innerHTML = `Live ${sportLabel()} schedule from ${source}. Times converted to ${timezoneLabel()}.`;
     render();
   } catch (error) {
-    fixtures.splice(0, fixtures.length, ...(currentTeam.id === 57 ? fallbackFixtures : []));
+    fixtures.splice(0, fixtures.length, ...(currentSport === 'soccer' && currentTeam.id === 57 ? fallbackFixtures : []));
     render();
-    sourceNote.innerHTML = currentTeam.id === 57 ? 'Live football-data.org feed unavailable. Showing verified Arsenal entries. <a href="https://www.arsenal.com/fixtures/men/fixtures" target="_blank" rel="noreferrer">Check Arsenal.com</a>.' : `No fixtures available for ${currentTeam.name}. Try another club or check <a href="https://www.football-data.org/" target="_blank" rel="noreferrer">football-data.org</a>.`;
+    sourceNote.innerHTML = currentSport === 'soccer' && currentTeam.id === 57 ? 'Live football-data.org feed unavailable. Showing verified Arsenal entries. <a href="https://www.arsenal.com/fixtures/men/fixtures" target="_blank" rel="noreferrer">Check Arsenal.com</a>.' : `No fixtures available for ${currentTeam.name}. Try another team or check the ${sportLabel()} provider.`;
     console.info('Live fixtures unavailable; showing the local schedule.', error);
   }
 }
@@ -159,10 +176,10 @@ function googleCalendarEvent(fixture) {
 function readSavedClubs() { return JSON.parse(localStorage.getItem('fixture-saved-clubs') || '[]'); }
 function writeSavedClubs(clubs) { localStorage.setItem('fixture-saved-clubs', JSON.stringify(clubs)); }
 function renderSavedClubs() {
-  const clubs = readSavedClubs();
-  savedClubs.innerHTML = clubs.length ? clubs.map(team => `<div class="saved-club" data-team="${team.id}"><button class="saved-club-main" data-open-team="${team.id}"><img class="team-mini-crest" src="${team.crest || `https://crests.football-data.org/${team.id}.png`}" alt="">${team.name}</button><button class="saved-club-remove" data-remove-team="${team.id}" type="button" aria-label="Remove ${team.name}">×</button></div>`).join('') : '<span class="timezone">No saved clubs yet</span>';
+  const clubs = readSavedClubs().filter(team => (team.sport || 'soccer') === currentSport);
+  savedClubs.innerHTML = clubs.length ? clubs.map(team => `<div class="saved-club" data-team="${team.id}"><button class="saved-club-main" data-open-team="${team.id}">${teamMark(team, true)}${team.name}</button><button class="saved-club-remove" data-remove-team="${team.id}" type="button" aria-label="Remove ${team.name}">×</button></div>`).join('') : `<span class="timezone">No saved ${sportLabel()} teams yet</span>`;
   savedClubs.querySelectorAll('[data-open-team]').forEach(button => button.addEventListener('click', () => selectTeam(clubs.find(team => String(team.id) === button.dataset.openTeam))));
-  savedClubs.querySelectorAll('[data-remove-team]').forEach(button => button.addEventListener('click', event => { event.stopPropagation(); writeSavedClubs(clubs.filter(team => String(team.id) !== button.dataset.removeTeam)); renderSavedClubs(); }));
+  savedClubs.querySelectorAll('[data-remove-team]').forEach(button => button.addEventListener('click', event => { event.stopPropagation(); writeSavedClubs(readSavedClubs().filter(team => `${team.sport || 'soccer'}:${team.id}` !== `${currentSport}:${button.dataset.removeTeam}`)); renderSavedClubs(); }));
 }
 async function searchTeams(event) {
   event.preventDefault();
@@ -170,21 +187,24 @@ async function searchTeams(event) {
   if (!search) return;
   clubResults.innerHTML = '<span class="timezone">Searching...</span>';
   try {
-    const response = await fetch(`/api/teams?search=${encodeURIComponent(search)}&_=${Date.now()}`);
+    const response = await fetch(`/api/teams?sport=${encodeURIComponent(currentSport)}&search=${encodeURIComponent(search)}&_=${Date.now()}`);
     if (!response.ok) throw new Error((await response.json()).error || 'Team search unavailable');
     const teams = await response.json();
-    clubResults.innerHTML = teams.length ? teams.map(team => `<button class="club-result" data-team="${team.id}"><span class="club-result-main"><img class="team-mini-crest" src="${team.crest || `https://crests.football-data.org/${team.id}.png`}" alt="">${team.name}</span><span>＋ Save</span></button>`).join('') : '<span class="timezone">No teams found</span>';
+    clubResults.innerHTML = teams.length ? teams.map(team => `<button class="club-result" data-team="${team.id}"><span class="club-result-main">${teamMark(team, true)}${team.name}</span><span>＋ Save</span></button>`).join('') : '<span class="timezone">No teams found</span>';
     clubResults.querySelectorAll('.club-result').forEach(button => button.addEventListener('click', () => selectTeam(teams.find(team => String(team.id) === button.dataset.team))));
   } catch (error) { clubResults.innerHTML = `<span class="timezone">${error.message}</span>`; }
 }
 async function selectTeam(team) {
   if (!team) return;
-  const clubs = readSavedClubs().filter(saved => saved.id !== team.id);
-  writeSavedClubs([team, ...clubs].slice(0, 12));
-  currentTeam = team;
+  const normalizedTeam = { ...team, sport: team.sport || currentSport };
+  const clubs = readSavedClubs().filter(saved => `${saved.sport || 'soccer'}:${saved.id}` !== `${normalizedTeam.sport}:${normalizedTeam.id}`);
+  writeSavedClubs([normalizedTeam, ...clubs].slice(0, 12));
+  currentTeam = normalizedTeam;
+  localStorage.setItem('fixture-current-team', JSON.stringify(currentTeam));
   clubDialog.close();
   renderSavedClubs();
   sourceNote.textContent = `Loading ${team.name} fixtures...`;
+  setTeamHeader();
   await loadLiveFixtures();
 }
 function calendarEvent(fixture) {
@@ -207,8 +227,21 @@ document.querySelector('#close-dialog').addEventListener('click', () => document
 document.querySelector('#club-select').addEventListener('click', () => { renderSavedClubs(); clubDialog.showModal(); clubSearchInput.focus(); });
 document.querySelector('#close-club-dialog').addEventListener('click', () => clubDialog.close());
 document.querySelector('#club-search-form').addEventListener('submit', searchTeams);
-timezoneSelect.addEventListener('change', () => { selectedTimeZone = timezoneSelect.value; localStorage.setItem('fixture-time-zone', selectedTimeZone); timezoneLabelElement.textContent = `Times shown in ${timezoneLabel()}`; render(); sourceNote.innerHTML = `Live schedule from <a href="https://www.football-data.org/" target="_blank" rel="noreferrer">football-data.org</a>. Times converted to ${timezoneLabel()}.`; });
+sportSelect.addEventListener('change', async () => {
+  currentSport = sportSelect.value;
+  localStorage.setItem('fixture-sport', currentSport);
+  const savedForSport = readSavedClubs().find(team => (team.sport || 'soccer') === currentSport);
+  currentTeam = savedForSport || (currentSport === 'nfl' ? { id: 18, sport: 'nfl', name: 'Philadelphia Eagles', abbreviation: 'PHI', crest: null } : { id: 57, sport: 'soccer', name: 'Arsenal', crest: 'https://crests.football-data.org/57.png' });
+  localStorage.setItem('fixture-current-team', JSON.stringify(currentTeam));
+  fixtures.splice(0, fixtures.length);
+  setTeamHeader();
+  render();
+  sourceNote.textContent = `Loading ${currentTeam.name} fixtures...`;
+  await loadLiveFixtures();
+});
+timezoneSelect.addEventListener('change', () => { selectedTimeZone = timezoneSelect.value; localStorage.setItem('fixture-time-zone', selectedTimeZone); timezoneLabelElement.textContent = `Times shown in ${timezoneLabel()}`; render(); const source = currentSport === 'nfl' ? '<a href="https://www.balldontlie.io/" target="_blank" rel="noreferrer">BALLDONTLIE</a>' : '<a href="https://www.football-data.org/" target="_blank" rel="noreferrer">football-data.org</a>'; sourceNote.innerHTML = `Live ${sportLabel()} schedule from ${source}. Times converted to ${timezoneLabel()}.`; });
 timezoneLabelElement.textContent = `Times shown in ${timezoneLabel()}`;
 document.querySelector('#fixture-form').addEventListener('submit', event => { event.preventDefault(); const data = new FormData(event.target); fixtures.push({ date: data.get('date'), time: data.get('time'), opponent: data.get('opponent'), venue: data.get('venue') || 'Venue TBC', competition: data.get('competition') || 'Competition TBC', home: true }); event.target.reset(); document.querySelector('#fixture-dialog').close(); render(); });
+setTeamHeader();
 render();
 loadLiveFixtures();
