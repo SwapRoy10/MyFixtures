@@ -1,19 +1,28 @@
-# Live fixture API setup
+# Live schedule API setup
 
-The app uses a Cloudflare Worker so the football-data.org token is never exposed in the browser.
+The app uses a Cloudflare Worker so schedule provider tokens are never exposed in the browser.
 
 1. Create a football-data.org token at https://www.football-data.org/client/register.
-2. Install Wrangler and log in to Cloudflare.
-3. From this directory, run:
+2. Create a BALLDONTLIE API key at https://app.balldontlie.io/.
+3. Install Wrangler and log in to Cloudflare.
+4. From this directory, run:
 
 ```text
 npx wrangler secret put FOOTBALL_DATA_API_KEY
+npx wrangler secret put BALLDONTLIE_API_KEY
 npx wrangler deploy
 ```
 
-4. Open the deployed Worker URL. It serves both the static app and `/api/fixtures`.
+5. Open the deployed Worker URL. It serves both the static app and `/api/fixtures`.
 
-The worker requests Arsenal team `57` from football-data.org for August 1, 2026 through May 30, 2027. It returns every competition made available to your football-data.org plan. The browser converts UTC timestamps to `America/New_York` Eastern Time and includes the competition in each calendar event.
+The worker requests soccer schedules from football-data.org and NFL schedules from BALLDONTLIE. It returns every competition or game made available to your provider plan. The browser converts UTC timestamps to the selected time zone and includes the competition or league in each calendar event.
+
+For the development Worker, set both secrets on the development Worker too:
+
+```text
+npx wrangler secret put FOOTBALL_DATA_API_KEY --name my-fixtures-api-development
+npx wrangler secret put BALLDONTLIE_API_KEY --name my-fixtures-api-development
+```
 
 ## Google Calendar bulk sync
 
