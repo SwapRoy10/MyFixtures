@@ -26,17 +26,20 @@
     .team-mini-crest { width: 28px; height: 28px; object-fit: contain; }
     .saved-heading { margin: 20px 0 8px; font: 11px 'DM Mono', monospace; color: var(--muted); text-transform: uppercase; }
     .club-switcher .button { white-space: nowrap; }
-    .sport-select { border: 1px solid var(--line); background: #fff; color: var(--ink); padding: 10px 12px; margin-bottom: 14px; min-width: 180px; }
+    .brand-group { display: flex; align-items: center; gap: 18px; }
+    .sport-select { border: 0; border-left: 1px solid var(--line); background: transparent; color: var(--muted); padding: 3px 0 3px 18px; min-width: 88px; font: 11px 'DM Mono', monospace; text-transform: uppercase; letter-spacing: .05em; cursor: pointer; outline-color: var(--red); }
+    .sport-select:hover, .sport-select:focus { color: var(--ink); }
     .team-initials { display: inline-grid; place-items: center; width: 30px; height: 30px; background: var(--ink); color: #fff; font: 11px 'DM Mono', monospace; vertical-align: middle; margin-right: 9px; }
     .team-mini-initials { display: inline-grid; place-items: center; width: 28px; height: 28px; background: var(--ink); color: #fff; font: 10px 'DM Mono', monospace; }
+    .team-mini-crest, .club-result .team-mini-crest, .saved-club .team-mini-crest { width: 30px; height: 30px; object-fit: contain; flex: 0 0 30px; }
     .fixture-add-disabled, .fixture-add-disabled:hover { background: var(--line); color: var(--muted); cursor: not-allowed; transform: none; }
-    @media (max-width: 700px) { .club-switcher { min-width: 0; } }
+    @media (max-width: 700px) { .club-switcher { min-width: 0; } .brand-group { gap: 10px; } .sport-select { min-width: 74px; padding-left: 10px; } }
   </style>
 </head>
 <body>
   <main class="shell">
     <header class="topbar">
-      <a class="brand" href="#">MyFixtures</a>
+      <div class="brand-group"><a class="brand" href="#">MyFixtures</a><select class="sport-select" id="sport-select" aria-label="Choose sport"><option value="soccer">Soccer</option><option value="nfl">NFL</option></select></div>
       <div class="topbar-meta"><span class="live-dot"></span><span>Season 26/27</span><span class="divider"></span><select id="timezone-select" aria-label="Choose time zone"><option value="America/New_York">Eastern Time</option><option value="America/Chicago">Central Time</option><option value="America/Denver">Mountain Time</option><option value="America/Los_Angeles">Pacific Time</option><option value="Europe/London">British Summer Time</option></select></div>
     </header>
 
@@ -51,7 +54,6 @@
     <section class="controls" aria-label="Fixture controls">
       <div>
         <p class="section-label">Selected team</p>
-        <select class="sport-select" id="sport-select" aria-label="Choose sport"><option value="soccer">Soccer</option><option value="nfl">NFL</option></select><br>
         <button class="club-select" id="club-select" type="button"><span id="team-mark-wrapper"><img class="club-mark" id="club-mark" src="https://crests.football-data.org/57.png" alt="Arsenal crest"></span> <span id="club-name">Arsenal</span> <span class="chevron">⌄</span></button>
       </div>
       <div class="control-actions">
@@ -93,6 +95,6 @@
     </form>
   </dialog>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="app.js?v=20260904-nfl-tbd-1"></script>
+  <script src="app.js?v=20260904-nfl-logos-1"></script>
 </body>
 </html>

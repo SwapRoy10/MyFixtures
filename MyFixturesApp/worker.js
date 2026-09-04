@@ -8,6 +8,10 @@ const jsonHeaders = {
   'access-control-allow-origin': '*'
 };
 
+function nflLogoUrl(abbreviation) {
+  return `https://a.espncdn.com/i/teamlogos/nfl/500/${abbreviation.toLowerCase()}.png`;
+}
+
 async function getRoster(code, headers) {
   const cached = rosterCache.get(code);
   if (cached && Date.now() - cached.created < rosterCacheDuration) return cached.teams;
@@ -57,7 +61,7 @@ async function searchNflTeams(url, env) {
   const search = (url.searchParams.get('search') || '').toLowerCase();
   const matches = teams
     .filter(team => `${team.full_name} ${team.name} ${team.location} ${team.abbreviation}`.toLowerCase().includes(search))
-    .map(team => ({ id: team.id, sport: 'nfl', name: team.full_name, abbreviation: team.abbreviation, crest: null }));
+    .map(team => ({ id: team.id, sport: 'nfl', name: team.full_name, abbreviation: team.abbreviation, crest: nflLogoUrl(team.abbreviation) }));
   return new Response(JSON.stringify(matches), { status: 200, headers: jsonHeaders });
 }
 

@@ -26,7 +26,7 @@ const fallbackFixtures = [...fixtures];
 let currentSport = localStorage.getItem('fixture-sport') || 'soccer';
 let currentTeam = JSON.parse(localStorage.getItem('fixture-current-team') || 'null') || { id: 57, sport: 'soccer', name: 'Arsenal', crest: 'https://crests.football-data.org/57.png' };
 if ((currentTeam.sport || 'soccer') !== currentSport) {
-  currentTeam = currentSport === 'nfl' ? { id: 18, sport: 'nfl', name: 'Philadelphia Eagles', abbreviation: 'PHI', crest: null } : { id: 57, sport: 'soccer', name: 'Arsenal', crest: 'https://crests.football-data.org/57.png' };
+  currentTeam = currentSport === 'nfl' ? { id: 18, sport: 'nfl', name: 'Philadelphia Eagles', abbreviation: 'PHI', crest: 'https://a.espncdn.com/i/teamlogos/nfl/500/phi.png' } : { id: 57, sport: 'soccer', name: 'Arsenal', crest: 'https://crests.football-data.org/57.png' };
 }
 const list = document.querySelector('#fixture-list');
 const sourceNote = document.querySelector('#source-note');
@@ -46,9 +46,11 @@ timezoneSelect.value = selectedTimeZone;
 sportSelect.value = currentSport;
 function timezoneLabel() { return timezoneSelect.options[timezoneSelect.selectedIndex].text; }
 function sportLabel() { return currentSport === 'nfl' ? 'NFL' : 'Soccer'; }
+function nflLogoUrl(abbreviation) { return `https://a.espncdn.com/i/teamlogos/nfl/500/${abbreviation.toLowerCase()}.png`; }
 function teamInitials(team) { return (team.abbreviation || team.name || 'TM').split(/\s+/).map(part => part[0]).join('').slice(0, 3).toUpperCase(); }
 function teamMark(team, mini = false) {
-  if (team.crest) return `<img class="${mini ? 'team-mini-crest' : 'club-mark'}" src="${team.crest}" alt="${team.name} crest">`;
+  const crest = team.crest || ((team.sport || currentSport) === 'nfl' && team.abbreviation ? nflLogoUrl(team.abbreviation) : null);
+  if (crest) return `<img class="${mini ? 'team-mini-crest' : 'club-mark'}" src="${crest}" alt="${team.name} logo">`;
   return `<span class="${mini ? 'team-mini-initials' : 'team-initials'}" aria-hidden="true">${teamInitials(team)}</span>`;
 }
 function setTeamHeader() {
@@ -238,7 +240,7 @@ sportSelect.addEventListener('change', async () => {
   currentSport = sportSelect.value;
   localStorage.setItem('fixture-sport', currentSport);
   const savedForSport = readSavedClubs().find(team => (team.sport || 'soccer') === currentSport);
-  currentTeam = savedForSport || (currentSport === 'nfl' ? { id: 18, sport: 'nfl', name: 'Philadelphia Eagles', abbreviation: 'PHI', crest: null } : { id: 57, sport: 'soccer', name: 'Arsenal', crest: 'https://crests.football-data.org/57.png' });
+  currentTeam = savedForSport || (currentSport === 'nfl' ? { id: 18, sport: 'nfl', name: 'Philadelphia Eagles', abbreviation: 'PHI', crest: nflLogoUrl('PHI') } : { id: 57, sport: 'soccer', name: 'Arsenal', crest: 'https://crests.football-data.org/57.png' });
   localStorage.setItem('fixture-current-team', JSON.stringify(currentTeam));
   fixtures.splice(0, fixtures.length);
   setTeamHeader();
