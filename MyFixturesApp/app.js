@@ -96,7 +96,10 @@ async function loadLiveFixtures() {
     const liveFixtures = payload.fixtures;
     if (!Array.isArray(liveFixtures) || liveFixtures.length === 0) throw new Error(`No live fixtures returned (${JSON.stringify(payload.errors || {})})`);
     fixtures.splice(0, fixtures.length, ...liveFixtures.map(item => {
-      if (item.utcDate && item.opponent) return { ...formatFixtureForSelectedZone(item.utcDate), ...item };
+      if (item.utcDate && item.opponent) {
+        const kickoff = formatFixtureForSelectedZone(item.utcDate);
+        return { ...item, date: kickoff.date, time: kickoff.time };
+      }
       const kickoff = formatFixtureForSelectedZone(item.utcDate);
       return { ...kickoff, utcDate: item.utcDate, opponent: item.homeTeam.id === currentTeam.id ? item.awayTeam.name : item.homeTeam.name, venue: item.venue || '', competition: item.competition.name, home: item.homeTeam.id === currentTeam.id };
     }));
