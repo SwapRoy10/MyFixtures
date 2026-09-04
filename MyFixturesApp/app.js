@@ -74,17 +74,33 @@ function fixtureDisplay(fixture) {
   const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
   return { date: new Date(`${values.year}-${values.month}-${values.day}T12:00:00Z`), time: `${values.hour}:${values.minute}` };
 }
+function selectedZoneDateKey(timestamp = Date.now()) {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: selectedTimeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(timestamp));
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+function fixtureDateKey(fixture) { return fixtureDisplay(fixture).date.toISOString().slice(0, 10); }
+function fixtureSortTime(fixture) {
+  if (fixture.utcDate) return new Date(fixture.utcDate).getTime();
+  return convertWallTimeToUtc(fixture.date, fixture.time || '23:59', 'America/New_York').getTime();
+}
+function isPastFixture(fixture) {
+  if (fixture.timeTbd) return fixtureDateKey(fixture) < selectedZoneDateKey();
+  return fixtureSortTime(fixture) < Date.now();
+}
+function calendarReadyFixtures(selected = fixtures) { return selected.filter(fixture => !fixture.timeTbd && !isPastFixture(fixture)); }
 function render() {
   const orderedFixtures = [...fixtures].sort((first, second) => (first.utcDate || first.date).localeCompare(second.utcDate || second.date));
   list.innerHTML = orderedFixtures.map((fixture, index) => {
     const display = fixtureDisplay(fixture);
     const dateFormat = new Intl.DateTimeFormat('en-GB', { timeZone: selectedTimeZone, day: '2-digit', month: 'short' });
     const dayFormat = new Intl.DateTimeFormat('en-GB', { timeZone: selectedTimeZone, weekday: 'short' });
+    const past = isPastFixture(fixture);
     const kickoff = fixture.timeTbd ? 'TBD' : display.time;
-    const addButton = fixture.timeTbd ? '<button class="fixture-add fixture-add-disabled" type="button" disabled>Time TBD</button>' : `<button class="fixture-add" data-index="${index}">＋ Google Calendar</button>`;
-    return `<article class="fixture"><div class="fixture-date"><strong>${dateFormat.format(display.date)}</strong><small>${dayFormat.format(display.date)}</small></div><div><div class="opponent">${currentTeam.name} v ${fixture.opponent}</div><div class="home-away">${fixture.home ? 'Home' : 'Away'} · ${fixture.competition}</div></div><div class="fixture-meta"><b>${kickoff}</b>${fixture.venue && fixture.venue !== 'TBC' ? `<br>${fixture.venue}` : ''}</div>${addButton}</article>`;
+    const addButton = fixture.timeTbd || past ? `<button class="fixture-add fixture-add-disabled" type="button" disabled>${past ? 'Played' : 'Time TBD'}</button>` : `<button class="fixture-add" data-index="${index}">＋ Google Calendar</button>`;
+    return `<article class="fixture${past ? ' fixture-past' : ''}"><div class="fixture-date"><strong>${dateFormat.format(display.date)}</strong><small>${dayFormat.format(display.date)}</small></div><div><div class="opponent">${currentTeam.name} v ${fixture.opponent}</div><div class="home-away">${fixture.home ? 'Home' : 'Away'} · ${fixture.competition}</div></div><div class="fixture-meta"><b>${kickoff}</b>${fixture.venue && fixture.venue !== 'TBC' ? `<br>${fixture.venue}` : ''}</div>${addButton}</article>`;
   }).join('');
-  document.querySelectorAll('.fixture-add').forEach(button => button.addEventListener('click', () => openGoogleCalendar(orderedFixtures[button.dataset.index])));
+  document.querySelectorAll('.fixture-add[data-index]').forEach(button => button.addEventListener('click', () => openGoogleCalendar(orderedFixtures[button.dataset.index])));
 }
 function formatFixtureForSelectedZone(timestamp) {
   const date = new Date(timestamp);
@@ -129,7 +145,10 @@ function googleCalendarUrl(fixture) {
   const params = new URLSearchParams({ action: 'TEMPLATE', text: `${currentTeam.name} v ${fixture.opponent} - ${fixture.competition}`, dates: `${start}/${end}`, ctz: selectedTimeZone, details: `${fixture.competition} - ${currentTeam.name} ${fixture.home ? 'home' : 'away'} fixture`, ...(fixture.venue && fixture.venue !== 'TBC' ? { location: fixture.venue } : {}) });
   return `https://calendar.google.com/calendar/render?${params}`;
 }
-function openGoogleCalendar(fixture) { window.open(googleCalendarUrl(fixture), '_blank', 'noopener'); }
+function openGoogleCalendar(fixture) {
+  if (!fixture || fixture.timeTbd || isPastFixture(fixture)) return;
+  window.open(googleCalendarUrl(fixture), '_blank', 'noopener');
+}
 function googleAuthMessage(error) {
   const message = error.message || '';
   if (message.includes('origin') || message.includes('Origin')) return 'Google rejected this site origin. Add https://my-fixtures-api.sorp.workers.dev as an authorized JavaScript origin.';
@@ -160,8 +179,8 @@ async function addAllToGoogleCalendar() {
   googleAllButton.innerHTML = '<span>…</span> Connecting to Google';
   try {
     const token = await getGoogleAccessToken();
-    const orderedFixtures = [...fixtures].filter(fixture => !fixture.timeTbd).sort((first, second) => first.date.localeCompare(second.date));
-    if (!orderedFixtures.length) throw new Error('All kickoff times are still TBD.');
+    const orderedFixtures = calendarReadyFixtures().sort((first, second) => fixtureSortTime(first) - fixtureSortTime(second));
+    if (!orderedFixtures.length) throw new Error('No remaining fixtures have confirmed kickoff times.');
     for (let index = 0; index < orderedFixtures.length; index += 1) {
       googleAllButton.innerHTML = `<span>…</span> Adding ${index + 1} of ${orderedFixtures.length}`;
       const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(googleCalendarEvent(orderedFixtures[index])) });
@@ -226,7 +245,11 @@ function calendarEvent(fixture) {
   return ['BEGIN:VEVENT', `UID:fixture-${fixture.date}-${fixture.opponent.replaceAll(' ', '-').toLowerCase()}@fixture`, `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}`, `DTSTART;TZID=${selectedTimeZone}:${start}`, `DTEND;TZID=${selectedTimeZone}:${end}`, `SUMMARY:${currentTeam.name} v ${escapeICS(fixture.opponent)} - ${escapeICS(fixture.competition)}`, fixture.venue ? `LOCATION:${escapeICS(fixture.venue)}` : null, `DESCRIPTION:${escapeICS(fixture.competition)} - ${currentTeam.name} ${fixture.home ? 'home' : 'away'} fixture`, 'END:VEVENT'].filter(Boolean).join('\r\n');
 }
 function downloadCalendar(selected) {
-  const calendarReady = selected.filter(fixture => !fixture.timeTbd);
+  const calendarReady = calendarReadyFixtures(selected);
+  if (!calendarReady.length) {
+    sourceNote.textContent = 'No remaining fixtures have confirmed kickoff times.';
+    return;
+  }
   const content = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Fixture//MyFixtures//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', ...calendarReady.map(calendarEvent), 'END:VCALENDAR'].join('\r\n');
   const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([content], { type: 'text/calendar;charset=utf-8' })); link.download = selected.length === 1 ? `myfixtures-${selected[0].date}.ics` : 'myfixtures-schedule.ics'; link.click(); URL.revokeObjectURL(link.href);
 }
