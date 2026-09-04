@@ -115,14 +115,22 @@ async function getCompetitionFixtures(code, dateFrom, dateTo, headers) {
   return ok ? payload.matches || [] : null;
 }
 
-async function getTeamFixtures(teamId, dateFrom, dateTo, headers) {
+function uniqueMatches(matches) {
+  return matches.filter((match, index, all) => all.findIndex(candidate => candidate.id === match.id) === index);
+}
+
+async function getTeamFixturePayload(teamId, dateFrom, dateTo, headers) {
   const apiUrl = `https://api.football-data.org/v4/teams/${teamId}/matches`;
   const query = new URLSearchParams({ dateFrom, dateTo });
-  const response = await fetch(`${apiUrl}?${query}`, { headers });
-  const payload = await response.json();
-  const responseHeaders = payload.message ? { ...jsonHeaders, 'cache-control': 'no-store' } : jsonHeaders;
-  return new Response(JSON.stringify({ fixtures: payload.matches || [], errors: payload.message ? { provider: payload.message } : {}, results: payload.resultSet?.count || 0 }), {
-    status: response.ok ? 200 : response.status,
+  return fetchProviderJson(`${apiUrl}?${query}`, headers, providerScheduleCacheTtl);
+}
+
+async function getTeamFixtures(teamId, dateFrom, dateTo, headers) {
+  const { ok, status, payload } = await getTeamFixturePayload(teamId, dateFrom, dateTo, headers);
+  const providerError = payload.message || payload.error;
+  const responseHeaders = providerError ? { ...jsonHeaders, 'cache-control': 'no-store' } : jsonHeaders;
+  return new Response(JSON.stringify({ fixtures: payload.matches || [], errors: providerError ? { provider: providerError } : {}, results: payload.resultSet?.count || 0 }), {
+    status: ok ? 200 : status,
     headers: responseHeaders
   });
 }
@@ -134,17 +142,23 @@ async function getSoccerFixtures(url, env) {
   const dateTo = url.searchParams.get('dateTo') || '2027-05-30';
   const requestedCodes = (url.searchParams.get('competitions') || '').split(',').map(code => code.trim()).filter(code => footballCompetitionCodes.includes(code));
   const competitionCodes = requestedCodes.length ? requestedCodes : await getTeamCompetitionCodes(teamId, headers);
+  const teamFixturePayload = await getTeamFixturePayload(teamId, dateFrom, dateTo, headers);
+  const teamFixtures = teamFixturePayload.ok ? teamFixturePayload.payload.matches || [] : [];
 
   if (competitionCodes.length) {
     const schedules = await Promise.all(competitionCodes.map(code => getCompetitionFixtures(code, dateFrom, dateTo, headers)));
     const providerUnavailable = schedules.every(matches => matches === null);
-    const fixtures = schedules
+    const competitionFixtures = schedules
       .flatMap(matches => matches || [])
-      .filter((match, index, all) => all.findIndex(candidate => candidate.id === match.id) === index)
       .filter(match => match.homeTeam?.id === teamId || match.awayTeam?.id === teamId);
+    const fixtures = uniqueMatches([...competitionFixtures, ...teamFixtures]);
     if (fixtures.length || !providerUnavailable) {
-      return new Response(JSON.stringify({ fixtures, errors: {}, results: fixtures.length, source: 'competition-cache' }), { status: 200, headers: jsonHeaders });
+      return new Response(JSON.stringify({ fixtures, errors: {}, results: fixtures.length, source: 'competition-team-cache' }), { status: 200, headers: jsonHeaders });
     }
+  }
+
+  if (teamFixturePayload.ok) {
+    return new Response(JSON.stringify({ fixtures: teamFixtures, errors: {}, results: teamFixtures.length, source: 'team-cache' }), { status: 200, headers: jsonHeaders });
   }
 
   return getTeamFixtures(teamId, dateFrom, dateTo, headers);
