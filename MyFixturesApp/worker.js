@@ -72,10 +72,44 @@ async function getSoccerFixtures(url, env) {
   });
 }
 
+function normalizeEspnNflGame(event, teamAbbreviation) {
+  const competition = event.competitions?.[0] || {};
+  const competitors = competition.competitors || [];
+  const selected = competitors.find(entry => entry.team?.abbreviation?.toLowerCase() === teamAbbreviation.toLowerCase());
+  const opponent = competitors.find(entry => entry.team?.abbreviation?.toLowerCase() !== teamAbbreviation.toLowerCase());
+  const seasonType = event.seasonType?.name || 'NFL';
+  return {
+    id: event.id,
+    sport: 'nfl',
+    utcDate: event.date,
+    opponent: opponent?.team?.displayName || 'Opponent TBC',
+    venue: competition.venue?.fullName || '',
+    competition: event.week?.text ? `${seasonType} - ${event.week.text}` : seasonType,
+    home: selected?.homeAway === 'home',
+    status: event.status?.type?.state || 'scheduled',
+    provider: 'espn'
+  };
+}
+
+async function getEspnNflFixtures(team, dateFrom, dateTo) {
+  if (!team?.abbreviation) return [];
+  const response = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${team.abbreviation.toLowerCase()}/schedule`);
+  if (!response.ok) return [];
+  const payload = await response.json();
+  return (payload.events || [])
+    .map(event => normalizeEspnNflGame(event, team.abbreviation))
+    .filter(game => {
+      const gameDate = game.utcDate.slice(0, 10);
+      return game.status !== 'post' && gameDate >= dateFrom && gameDate <= dateTo;
+    });
+}
+
 async function getNflFixtures(url, env) {
   if (!env.BALLDONTLIE_API_KEY) return errorResponse('BALLDONTLIE_API_KEY is not configured.');
   const teamId = Number(url.searchParams.get('team'));
   if (!teamId) return errorResponse('A BALLDONTLIE NFL team id is required.', 400);
+  const teams = await getNflTeams(env);
+  const selectedTeam = teams?.find(team => team.id === teamId);
   const dateFrom = url.searchParams.get('dateFrom') || '2026-08-01';
   const dateTo = url.searchParams.get('dateTo') || '2027-05-30';
   const seasonStartDate = new Date(`${dateFrom}T00:00:00Z`);
@@ -101,7 +135,7 @@ async function getNflFixtures(url, env) {
     return {
       id: game.id,
       sport: 'nfl',
-      utcDate: game.datetime || `${game.date}T00:00:00.000Z`,
+      utcDate: game.date,
       opponent: opponent.full_name || `${opponent.location || ''} ${opponent.name || ''}`.trim() || 'Opponent TBC',
       venue: game.venue || '',
       competition: game.season_type === 3 ? 'NFL Postseason' : game.season_type === 1 ? 'NFL Preseason' : 'NFL',
@@ -112,7 +146,9 @@ async function getNflFixtures(url, env) {
     const gameDate = game.utcDate.slice(0, 10);
     return game.status !== 'final' && gameDate >= dateFrom && gameDate <= dateTo;
   });
-  return new Response(JSON.stringify({ fixtures: games, results: games.length }), { status: 200, headers: jsonHeaders });
+  if (games.length) return new Response(JSON.stringify({ fixtures: games, results: games.length, provider: 'balldontlie' }), { status: 200, headers: jsonHeaders });
+  const fallbackGames = await getEspnNflFixtures(selectedTeam, dateFrom, dateTo);
+  return new Response(JSON.stringify({ fixtures: fallbackGames, results: fallbackGames.length, provider: fallbackGames.length ? 'espn' : 'balldontlie' }), { status: 200, headers: jsonHeaders });
 }
 
 export default {
