@@ -6,7 +6,7 @@ const teamSearchCacheTtl = 12 * 60 * 60;
 const fixtureCacheTtl = 60 * 60;
 const providerRosterCacheTtl = 12 * 60 * 60;
 const providerScheduleCacheTtl = 60 * 60;
-const footballCompetitionCodes = ['PL', 'CL', 'ELC', 'FAC', 'SA', 'PPL', 'DED', 'PD', 'BL1', 'FL1'];
+const footballCompetitionCodes = ['PL', 'CL', 'EL', 'UCL', 'FAC', 'FLC', 'ELC', 'SA', 'PPL', 'DED', 'PD', 'CDR', 'BL1', 'DFB', 'FL1'];
 const jsonHeaders = {
   'content-type': 'application/json; charset=utf-8',
   'cache-control': 'public, max-age=900',
@@ -110,14 +110,14 @@ async function getTeamCompetitionCodes(teamId, headers) {
 }
 
 async function getCompetitionFixtures(code, dateFrom, dateTo, headers) {
-  const query = new URLSearchParams({ dateFrom, dateTo, status: 'SCHEDULED' });
+  const query = new URLSearchParams({ dateFrom, dateTo });
   const { ok, payload } = await fetchProviderJson(`https://api.football-data.org/v4/competitions/${code}/matches?${query}`, headers, providerScheduleCacheTtl);
   return ok ? payload.matches || [] : null;
 }
 
 async function getTeamFixtures(teamId, dateFrom, dateTo, headers) {
   const apiUrl = `https://api.football-data.org/v4/teams/${teamId}/matches`;
-  const query = new URLSearchParams({ dateFrom, dateTo, status: 'SCHEDULED' });
+  const query = new URLSearchParams({ dateFrom, dateTo });
   const response = await fetch(`${apiUrl}?${query}`, { headers });
   const payload = await response.json();
   const responseHeaders = payload.message ? { ...jsonHeaders, 'cache-control': 'no-store' } : jsonHeaders;
