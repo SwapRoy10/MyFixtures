@@ -22,6 +22,7 @@ const fixtures = [
   { date: '2027-05-15', time: '15:00', opponent: 'TBC', venue: 'TBC', competition: 'Premier League', home: false },
   { date: '2027-05-30', time: '16:00', opponent: 'TBC', venue: 'TBC', competition: 'Season final', home: true }
 ];
+const appRelease = '20260904-soccer-cache-1';
 const fallbackFixtures = [...fixtures];
 let currentSport = localStorage.getItem('fixture-sport') || 'soccer';
 let currentTeam = JSON.parse(localStorage.getItem('fixture-current-team') || 'null') || { id: 57, sport: 'soccer', name: 'Arsenal', crest: 'https://crests.football-data.org/57.png' };
@@ -111,7 +112,7 @@ function formatFixtureForSelectedZone(timestamp) {
 async function loadLiveFixtures() {
   try {
     const competitions = Array.isArray(currentTeam.competitions) && currentTeam.competitions.length ? `&competitions=${encodeURIComponent(currentTeam.competitions.join(','))}` : '';
-    const response = await fetch(`/api/fixtures?sport=${encodeURIComponent(currentSport)}&team=${currentTeam.id}&dateFrom=2026-08-01&dateTo=2027-05-30${competitions}`);
+    const response = await fetch(`/api/fixtures?sport=${encodeURIComponent(currentSport)}&team=${currentTeam.id}&dateFrom=2026-08-01&dateTo=2027-05-30${competitions}&release=${appRelease}`);
     if (!response.ok) throw new Error(`Fixture API returned ${response.status}`);
     const payload = await response.json();
     const liveFixtures = payload.fixtures;
