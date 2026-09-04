@@ -76,12 +76,18 @@ async function getNflFixtures(url, env) {
   if (!env.BALLDONTLIE_API_KEY) return errorResponse('BALLDONTLIE_API_KEY is not configured.');
   const teamId = Number(url.searchParams.get('team'));
   if (!teamId) return errorResponse('A BALLDONTLIE NFL team id is required.', 400);
+  const dateFrom = url.searchParams.get('dateFrom') || '2026-08-01';
+  const dateTo = url.searchParams.get('dateTo') || '2027-05-30';
+  const seasonStartDate = new Date(`${dateFrom}T00:00:00Z`);
+  const season = seasonStartDate.getUTCMonth() < 2 ? seasonStartDate.getUTCFullYear() - 1 : seasonStartDate.getUTCFullYear();
   const query = new URLSearchParams({
     'team_ids[]': String(teamId),
-    start_date: url.searchParams.get('dateFrom') || '2026-08-01',
-    end_date: url.searchParams.get('dateTo') || '2027-05-30',
+    'seasons[]': String(season),
+    'season_type[]': '1',
     per_page: '100'
   });
+  query.append('season_type[]', '2');
+  query.append('season_type[]', '3');
   const response = await fetch(`https://api.balldontlie.io/nfl/v1/games?${query}`, {
     headers: { Authorization: env.BALLDONTLIE_API_KEY }
   });
@@ -102,7 +108,10 @@ async function getNflFixtures(url, env) {
       home: isHome,
       status: game.status_state || game.status || 'scheduled'
     };
-  }).filter(game => game.status !== 'final');
+  }).filter(game => {
+    const gameDate = game.utcDate.slice(0, 10);
+    return game.status !== 'final' && gameDate >= dateFrom && gameDate <= dateTo;
+  });
   return new Response(JSON.stringify({ fixtures: games, results: games.length }), { status: 200, headers: jsonHeaders });
 }
 
