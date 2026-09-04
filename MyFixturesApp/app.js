@@ -1,0 +1,214 @@
+const fixtures = [
+  { date: '2026-09-06', time: '11:30', opponent: 'Chelsea', venue: 'Emirates Stadium', competition: 'Premier League', home: true },
+  { date: '2026-09-09', time: '15:00', opponent: 'Napoli', venue: 'Stadio Diego Armando Maradona', competition: 'Champions League', home: false },
+  { date: '2026-09-12', time: '15:00', opponent: 'Sunderland', venue: 'Stadium of Light', competition: 'Premier League', home: false },
+  { date: '2026-09-15', time: '15:00', opponent: 'Ipswich Town', venue: 'Portman Road', competition: 'Carabao Cup', home: false },
+  { date: '2026-09-19', time: '10:00', opponent: 'Brighton', venue: 'American Express Stadium', competition: 'Premier League', home: false },
+  { date: '2026-10-03', time: '15:00', opponent: 'TBC', venue: 'TBC', competition: 'Premier League', home: true },
+  { date: '2026-10-21', time: '20:00', opponent: 'TBC', venue: 'TBC', competition: 'Champions League', home: true },
+  { date: '2026-11-07', time: '15:00', opponent: 'TBC', venue: 'TBC', competition: 'Premier League', home: false },
+  { date: '2026-11-28', time: '15:00', opponent: 'TBC', venue: 'TBC', competition: 'Premier League', home: true },
+  { date: '2026-12-05', time: '15:00', opponent: 'TBC', venue: 'TBC', competition: 'Premier League', home: false },
+  { date: '2026-12-19', time: '15:00', opponent: 'TBC', venue: 'TBC', competition: 'Premier League', home: true },
+  { date: '2027-01-09', time: '15:00', opponent: 'TBC', venue: 'TBC', competition: 'FA Cup', home: true },
+  { date: '2027-01-23', time: '15:00', opponent: 'TBC', venue: 'TBC', competition: 'Premier League', home: false },
+  { date: '2027-02-06', time: '15:00', opponent: 'TBC', venue: 'TBC', competition: 'Premier League', home: true },
+  { date: '2027-02-17', time: '20:00', opponent: 'TBC', venue: 'TBC', competition: 'Champions League', home: false },
+  { date: '2027-03-06', time: '15:00', opponent: 'TBC', venue: 'TBC', competition: 'Premier League', home: true },
+  { date: '2027-03-20', time: '15:00', opponent: 'TBC', venue: 'TBC', competition: 'FA Cup', home: true },
+  { date: '2027-04-03', time: '15:00', opponent: 'TBC', venue: 'TBC', competition: 'Premier League', home: false },
+  { date: '2027-04-17', time: '15:00', opponent: 'TBC', venue: 'TBC', competition: 'Champions League', home: true },
+  { date: '2027-05-01', time: '15:00', opponent: 'TBC', venue: 'TBC', competition: 'Premier League', home: true },
+  { date: '2027-05-15', time: '15:00', opponent: 'TBC', venue: 'TBC', competition: 'Premier League', home: false },
+  { date: '2027-05-30', time: '16:00', opponent: 'TBC', venue: 'TBC', competition: 'Season final', home: true }
+];
+const fallbackFixtures = [...fixtures];
+let currentTeam = { id: 57, name: 'Arsenal' };
+const list = document.querySelector('#fixture-list');
+const sourceNote = document.querySelector('#source-note');
+const timezoneLabelElement = document.querySelector('#timezone-label');
+const clubDialog = document.querySelector('#club-dialog');
+const clubResults = document.querySelector('#club-results');
+const savedClubs = document.querySelector('#saved-clubs');
+const clubSearchInput = document.querySelector('#club-search-input');
+const googleAllButton = document.querySelector('#google-all');
+const googleClientId = '182131305802-0i417v1pr1tarbne0gofgqcvr2oqolfb.apps.googleusercontent.com';
+const calendarScope = 'https://www.googleapis.com/auth/calendar.events';
+let selectedTimeZone = localStorage.getItem('fixture-time-zone') || 'America/New_York';
+const timezoneSelect = document.querySelector('#timezone-select');
+timezoneSelect.value = selectedTimeZone;
+function timezoneLabel() { return timezoneSelect.options[timezoneSelect.selectedIndex].text; }
+function convertWallTimeToUtc(dateValue, timeValue, timeZone) {
+  const target = Date.parse(`${dateValue}T${timeValue}:00Z`);
+  let guess = new Date(target);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(guess);
+    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    const displayed = Date.parse(`${values.year}-${values.month}-${values.day}T${values.hour}:${values.minute}:00Z`);
+    guess = new Date(guess.getTime() + (target - displayed));
+  }
+  return guess;
+}
+function fixtureDisplay(fixture) {
+  const sourceDate = fixture.utcDate ? new Date(fixture.utcDate) : convertWallTimeToUtc(fixture.date, fixture.time, 'America/New_York');
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: selectedTimeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(sourceDate);
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return { date: new Date(`${values.year}-${values.month}-${values.day}T12:00:00Z`), time: `${values.hour}:${values.minute}` };
+}
+function render() {
+  const orderedFixtures = [...fixtures].sort((first, second) => (first.utcDate || first.date).localeCompare(second.utcDate || second.date));
+  list.innerHTML = orderedFixtures.map((fixture, index) => {
+    const display = fixtureDisplay(fixture);
+    const dateFormat = new Intl.DateTimeFormat('en-GB', { timeZone: selectedTimeZone, day: '2-digit', month: 'short' });
+    const dayFormat = new Intl.DateTimeFormat('en-GB', { timeZone: selectedTimeZone, weekday: 'short' });
+    return `<article class="fixture"><div class="fixture-date"><strong>${dateFormat.format(display.date)}</strong><small>${dayFormat.format(display.date)}</small></div><div><div class="opponent">${currentTeam.name} v ${fixture.opponent}</div><div class="home-away">${fixture.home ? 'Home' : 'Away'} · ${fixture.competition}</div></div><div class="fixture-meta"><b>${display.time}</b>${fixture.venue && fixture.venue !== 'TBC' ? `<br>${fixture.venue}` : ''}</div><button class="fixture-add" data-index="${index}">＋ Google Calendar</button></article>`;
+  }).join('');
+  document.querySelectorAll('.fixture-add').forEach(button => button.addEventListener('click', () => openGoogleCalendar(orderedFixtures[button.dataset.index])));
+}
+function formatFixtureForSelectedZone(timestamp) {
+  const date = new Date(timestamp);
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: selectedTimeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(date);
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return { date: `${values.year}-${values.month}-${values.day}`, time: `${values.hour}:${values.minute}` };
+}
+async function loadLiveFixtures() {
+  try {
+    const response = await fetch(`/api/fixtures?team=${currentTeam.id}&dateFrom=2026-08-01&dateTo=2027-05-30`);
+    if (!response.ok) throw new Error(`Fixture API returned ${response.status}`);
+    const payload = await response.json();
+    const liveFixtures = payload.fixtures;
+    if (!Array.isArray(liveFixtures) || liveFixtures.length === 0) throw new Error(`No live fixtures returned (${JSON.stringify(payload.errors || {})})`);
+    fixtures.splice(0, fixtures.length, ...liveFixtures.map(item => {
+      const kickoff = formatFixtureForSelectedZone(item.utcDate);
+      return { ...kickoff, utcDate: item.utcDate, opponent: item.homeTeam.id === currentTeam.id ? item.awayTeam.name : item.homeTeam.name, venue: item.venue || '', competition: item.competition.name, home: item.homeTeam.id === currentTeam.id };
+    }));
+    document.querySelector('#club-name').textContent = currentTeam.name;
+    document.querySelector('#club-mark').src = currentTeam.crest || `https://crests.football-data.org/${currentTeam.id}.png`;
+    document.querySelector('#club-mark').alt = `${currentTeam.name} crest`;
+    sourceNote.innerHTML = `Live schedule from <a href="https://www.football-data.org/" target="_blank" rel="noreferrer">football-data.org</a>. Times converted to ${timezoneLabel()}. <a href="https://www.arsenal.com/fixtures/men/fixtures" target="_blank" rel="noreferrer">Check Arsenal.com</a> for late changes.`;
+    render();
+  } catch (error) {
+    fixtures.splice(0, fixtures.length, ...(currentTeam.id === 57 ? fallbackFixtures : []));
+    render();
+    sourceNote.innerHTML = currentTeam.id === 57 ? 'Live football-data.org feed unavailable. Showing verified Arsenal entries. <a href="https://www.arsenal.com/fixtures/men/fixtures" target="_blank" rel="noreferrer">Check Arsenal.com</a>.' : `No fixtures available for ${currentTeam.name}. Try another club or check <a href="https://www.football-data.org/" target="_blank" rel="noreferrer">football-data.org</a>.`;
+    console.info('Live fixtures unavailable; showing the local schedule.', error);
+  }
+}
+function escapeICS(value) { return String(value).replace(/[\\;,]/g, match => `\\${match}`).replace(/\n/g, '\\n'); }
+function googleCalendarUrl(fixture) {
+  const display = fixtureDisplay(fixture);
+  const start = `${display.date.toISOString().slice(0, 10).replaceAll('-', '')}T${display.time.replace(':', '')}00`;
+  const [hours, minutes] = display.time.split(':').map(Number);
+  const endTotalMinutes = hours * 60 + minutes + 120;
+  const end = `${display.date.toISOString().slice(0, 10).replaceAll('-', '')}T${String(Math.floor(endTotalMinutes / 60) % 24).padStart(2, '0')}${String(endTotalMinutes % 60).padStart(2, '0')}00`;
+  const params = new URLSearchParams({ action: 'TEMPLATE', text: `${currentTeam.name} v ${fixture.opponent} - ${fixture.competition}`, dates: `${start}/${end}`, ctz: selectedTimeZone, details: `${fixture.competition} - ${currentTeam.name} ${fixture.home ? 'home' : 'away'} fixture`, ...(fixture.venue && fixture.venue !== 'TBC' ? { location: fixture.venue } : {}) });
+  return `https://calendar.google.com/calendar/render?${params}`;
+}
+function openGoogleCalendar(fixture) { window.open(googleCalendarUrl(fixture), '_blank', 'noopener'); }
+function googleAuthMessage(error) {
+  const message = error.message || '';
+  if (message.includes('origin') || message.includes('Origin')) return 'Google rejected this site origin. Add https://my-fixtures-api.sorp.workers.dev as an authorized JavaScript origin.';
+  if (message.includes('access_denied') || message.includes('organization')) return 'Google blocked this account. Set the OAuth app to External and add your account as a test user.';
+  if (message.includes('popup')) return 'Google sign-in was blocked. Allow popups for this site and try again.';
+  return `Google Calendar could not be connected: ${message}`;
+}
+function waitForGoogleIdentity() {
+  return new Promise((resolve, reject) => {
+    const started = Date.now();
+    const check = () => {
+      if (window.google?.accounts?.oauth2) return resolve();
+      if (Date.now() - started > 10000) return reject(new Error('Google sign-in could not load.'));
+      setTimeout(check, 100);
+    };
+    check();
+  });
+}
+async function getGoogleAccessToken() {
+  await waitForGoogleIdentity();
+  return new Promise((resolve, reject) => {
+    const tokenClient = google.accounts.oauth2.initTokenClient({ client_id: googleClientId, scope: calendarScope, callback: response => response.error ? reject(new Error(response.error_description || response.error)) : resolve(response.access_token), error_callback: error => reject(new Error(error.type || 'Google sign-in was cancelled or blocked.')) });
+    tokenClient.requestAccessToken({ prompt: 'consent' });
+  });
+}
+async function addAllToGoogleCalendar() {
+  googleAllButton.disabled = true;
+  googleAllButton.innerHTML = '<span>…</span> Connecting to Google';
+  try {
+    const token = await getGoogleAccessToken();
+    const orderedFixtures = [...fixtures].sort((first, second) => first.date.localeCompare(second.date));
+    for (let index = 0; index < orderedFixtures.length; index += 1) {
+      googleAllButton.innerHTML = `<span>…</span> Adding ${index + 1} of ${orderedFixtures.length}`;
+      const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(googleCalendarEvent(orderedFixtures[index])) });
+      if (!response.ok) throw new Error(`Google Calendar rejected fixture ${index + 1}`);
+    }
+    googleAllButton.innerHTML = '<span>✓</span> Fixtures added to Google Calendar';
+  } catch (error) {
+    googleAllButton.innerHTML = '<span>＋</span> Add all to Google Calendar';
+    sourceNote.textContent = googleAuthMessage(error);
+  } finally {
+    googleAllButton.disabled = false;
+  }
+}
+function googleCalendarEvent(fixture) {
+  const display = fixtureDisplay(fixture);
+  const [hours, minutes] = display.time.split(':').map(Number);
+  const endTotalMinutes = hours * 60 + minutes + 120;
+  const endTime = `${String(Math.floor(endTotalMinutes / 60) % 24).padStart(2, '0')}:${String(endTotalMinutes % 60).padStart(2, '0')}:00`;
+  return { summary: `${currentTeam.name} v ${fixture.opponent} - ${fixture.competition}`, description: `${fixture.competition} - ${currentTeam.name} ${fixture.home ? 'home' : 'away'} fixture`, ...(fixture.venue && fixture.venue !== 'TBC' ? { location: fixture.venue } : {}), start: { dateTime: `${display.date.toISOString().slice(0, 10)}T${display.time}:00`, timeZone: selectedTimeZone }, end: { dateTime: `${display.date.toISOString().slice(0, 10)}T${endTime}`, timeZone: selectedTimeZone } };
+}
+function readSavedClubs() { return JSON.parse(localStorage.getItem('fixture-saved-clubs') || '[]'); }
+function writeSavedClubs(clubs) { localStorage.setItem('fixture-saved-clubs', JSON.stringify(clubs)); }
+function renderSavedClubs() {
+  const clubs = readSavedClubs();
+  savedClubs.innerHTML = clubs.length ? clubs.map(team => `<div class="saved-club" data-team="${team.id}"><button class="saved-club-main" data-open-team="${team.id}"><img class="team-mini-crest" src="${team.crest || `https://crests.football-data.org/${team.id}.png`}" alt="">${team.name}</button><button class="saved-club-remove" data-remove-team="${team.id}" type="button" aria-label="Remove ${team.name}">×</button></div>`).join('') : '<span class="timezone">No saved clubs yet</span>';
+  savedClubs.querySelectorAll('[data-open-team]').forEach(button => button.addEventListener('click', () => selectTeam(clubs.find(team => String(team.id) === button.dataset.openTeam))));
+  savedClubs.querySelectorAll('[data-remove-team]').forEach(button => button.addEventListener('click', event => { event.stopPropagation(); writeSavedClubs(clubs.filter(team => String(team.id) !== button.dataset.removeTeam)); renderSavedClubs(); }));
+}
+async function searchTeams(event) {
+  event.preventDefault();
+  const search = clubSearchInput.value.trim();
+  if (!search) return;
+  clubResults.innerHTML = '<span class="timezone">Searching...</span>';
+  try {
+    const response = await fetch(`/api/teams?search=${encodeURIComponent(search)}&_=${Date.now()}`);
+    if (!response.ok) throw new Error((await response.json()).error || 'Team search unavailable');
+    const teams = await response.json();
+    clubResults.innerHTML = teams.length ? teams.map(team => `<button class="club-result" data-team="${team.id}"><span class="club-result-main"><img class="team-mini-crest" src="${team.crest || `https://crests.football-data.org/${team.id}.png`}" alt="">${team.name}</span><span>＋ Save</span></button>`).join('') : '<span class="timezone">No teams found</span>';
+    clubResults.querySelectorAll('.club-result').forEach(button => button.addEventListener('click', () => selectTeam(teams.find(team => String(team.id) === button.dataset.team))));
+  } catch (error) { clubResults.innerHTML = `<span class="timezone">${error.message}</span>`; }
+}
+async function selectTeam(team) {
+  if (!team) return;
+  const clubs = readSavedClubs().filter(saved => saved.id !== team.id);
+  writeSavedClubs([team, ...clubs].slice(0, 12));
+  currentTeam = team;
+  clubDialog.close();
+  renderSavedClubs();
+  sourceNote.textContent = `Loading ${team.name} fixtures...`;
+  await loadLiveFixtures();
+}
+function calendarEvent(fixture) {
+  const display = fixtureDisplay(fixture);
+  const displayDate = display.date.toISOString().slice(0, 10).replaceAll('-', '');
+  const start = `${displayDate}T${display.time.replace(':', '')}00`;
+  const [hours, minutes] = display.time.split(':').map(Number);
+  const endTotalMinutes = hours * 60 + minutes + 120;
+  const end = `${displayDate}T${String(Math.floor(endTotalMinutes / 60) % 24).padStart(2, '0')}${String(endTotalMinutes % 60).padStart(2, '0')}00`;
+  return ['BEGIN:VEVENT', `UID:fixture-${fixture.date}-${fixture.opponent.replaceAll(' ', '-').toLowerCase()}@fixture`, `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}`, `DTSTART;TZID=${selectedTimeZone}:${start}`, `DTEND;TZID=${selectedTimeZone}:${end}`, `SUMMARY:${currentTeam.name} v ${escapeICS(fixture.opponent)} - ${escapeICS(fixture.competition)}`, fixture.venue ? `LOCATION:${escapeICS(fixture.venue)}` : null, `DESCRIPTION:${escapeICS(fixture.competition)} - ${currentTeam.name} ${fixture.home ? 'home' : 'away'} fixture`, 'END:VEVENT'].filter(Boolean).join('\r\n');
+}
+function downloadCalendar(selected) {
+  const content = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Fixture//Arsenal Fixtures//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', ...selected.map(calendarEvent), 'END:VCALENDAR'].join('\r\n');
+  const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([content], { type: 'text/calendar;charset=utf-8' })); link.download = selected.length === 1 ? `arsenal-${selected[0].date}.ics` : 'arsenal-fixtures.ics'; link.click(); URL.revokeObjectURL(link.href);
+}
+document.querySelector('#export-all').addEventListener('click', () => downloadCalendar(fixtures));
+googleAllButton.addEventListener('click', addAllToGoogleCalendar);
+document.querySelector('#add-fixture').addEventListener('click', () => document.querySelector('#fixture-dialog').showModal());
+document.querySelector('#close-dialog').addEventListener('click', () => document.querySelector('#fixture-dialog').close());
+document.querySelector('#club-select').addEventListener('click', () => { renderSavedClubs(); clubDialog.showModal(); clubSearchInput.focus(); });
+document.querySelector('#close-club-dialog').addEventListener('click', () => clubDialog.close());
+document.querySelector('#club-search-form').addEventListener('submit', searchTeams);
+timezoneSelect.addEventListener('change', () => { selectedTimeZone = timezoneSelect.value; localStorage.setItem('fixture-time-zone', selectedTimeZone); timezoneLabelElement.textContent = `Times shown in ${timezoneLabel()}`; render(); sourceNote.innerHTML = `Live schedule from <a href="https://www.football-data.org/" target="_blank" rel="noreferrer">football-data.org</a>. Times converted to ${timezoneLabel()}.`; });
+timezoneLabelElement.textContent = `Times shown in ${timezoneLabel()}`;
+document.querySelector('#fixture-form').addEventListener('submit', event => { event.preventDefault(); const data = new FormData(event.target); fixtures.push({ date: data.get('date'), time: data.get('time'), opponent: data.get('opponent'), venue: data.get('venue') || 'Venue TBC', competition: data.get('competition') || 'Competition TBC', home: true }); event.target.reset(); document.querySelector('#fixture-dialog').close(); render(); });
+render();
+loadLiveFixtures();

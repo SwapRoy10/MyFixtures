@@ -1,0 +1,7 @@
+name = "my-fixtures-api"
+main = "worker.js"
+compatibility_date = "2026-09-03"
+assets = { directory = ".", binding = "ASSETS" }
+
+[vars]
+# Configure the token with: wrangler secret put FOOTBALL_DATA_API_KEY
