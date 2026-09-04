@@ -73,7 +73,8 @@ function formatFixtureForSelectedZone(timestamp) {
 }
 async function loadLiveFixtures() {
   try {
-    const response = await fetch(`/api/fixtures?team=${currentTeam.id}&dateFrom=2026-08-01&dateTo=2027-05-30`);
+    const competitions = Array.isArray(currentTeam.competitions) && currentTeam.competitions.length ? `&competitions=${encodeURIComponent(currentTeam.competitions.join(','))}` : '';
+    const response = await fetch(`/api/fixtures?team=${currentTeam.id}&dateFrom=2026-08-01&dateTo=2027-05-30${competitions}`);
     if (!response.ok) throw new Error(`Fixture API returned ${response.status}`);
     const payload = await response.json();
     const liveFixtures = payload.fixtures;

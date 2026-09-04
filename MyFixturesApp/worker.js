@@ -2,6 +2,9 @@ const rosterCache = new Map();
 const rosterCacheDuration = 30 * 60 * 1000;
 const teamSearchCacheTtl = 12 * 60 * 60;
 const fixtureCacheTtl = 60 * 60;
+const providerRosterCacheTtl = 12 * 60 * 60;
+const providerScheduleCacheTtl = 60 * 60;
+const footballCompetitionCodes = ['PL', 'CL', 'ELC', 'FAC', 'SA', 'PPL', 'DED', 'PD', 'BL1', 'FL1'];
 const jsonHeaders = {
   'content-type': 'application/json; charset=utf-8',
   'cache-control': 'public, max-age=900',
@@ -11,9 +14,8 @@ const jsonHeaders = {
 async function getRoster(code, headers) {
   const cached = rosterCache.get(code);
   if (cached && Date.now() - cached.created < rosterCacheDuration) return cached.teams;
-  const response = await fetch(`https://api.football-data.org/v4/competitions/${code}/teams`, { headers });
-  if (!response.ok) return null;
-  const payload = await response.json();
+  const { ok, payload } = await fetchProviderJson(`https://api.football-data.org/v4/competitions/${code}/teams`, headers, providerRosterCacheTtl);
+  if (!ok) return null;
   const teams = payload.teams || [];
   rosterCache.set(code, { created: Date.now(), teams });
   return teams;
@@ -61,24 +63,79 @@ async function withApiCache(request, ttlSeconds, handler) {
   return cacheableResponse;
 }
 
+async function fetchProviderJson(providerUrl, headers, ttlSeconds) {
+  const cache = caches.default;
+  const cacheKey = new Request(providerUrl);
+  const cached = await cache.match(cacheKey);
+  if (cached) return { ok: true, status: cached.status, payload: await cached.json(), fromCache: true };
+
+  const response = await fetch(providerUrl, { headers });
+  const payload = await response.json();
+  const providerError = payload.message || payload.error;
+  if (response.ok && !providerError) {
+    await cache.put(cacheKey, new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': `public, max-age=${ttlSeconds}` }
+    }));
+  }
+  return { ok: response.ok && !providerError, status: response.status, payload, fromCache: false };
+}
+
 async function searchTeams(url, headers) {
   const search = (url.searchParams.get('search') || '').toLowerCase();
-  const rosters = await Promise.all(['PL', 'CL', 'ELC', 'FAC', 'SA', 'PPL', 'DED', 'PD', 'BL1', 'FL1'].map(code => getRoster(code, headers)));
-  if (rosters.every(roster => roster === null)) return errorResponse('football-data.org is temporarily unavailable or rate-limited.');
-  const teams = rosters.flatMap(roster => roster || []).filter((team, index, all) => all.findIndex(candidate => candidate.id === team.id) === index).filter(team => `${team.name} ${team.shortName || ''}`.toLowerCase().includes(search));
-  return new Response(JSON.stringify(teams.map(team => ({ id: team.id, name: team.shortName || team.name, crest: team.crest }))), { status: 200, headers: jsonHeaders });
+  const rosters = await Promise.all(footballCompetitionCodes.map(async code => ({ code, teams: await getRoster(code, headers) })));
+  if (rosters.every(roster => roster.teams === null)) return errorResponse('football-data.org is temporarily unavailable or rate-limited.');
+  const teamsById = new Map();
+  rosters.forEach(roster => (roster.teams || []).forEach(team => {
+    const existing = teamsById.get(team.id) || { ...team, competitions: [] };
+    existing.competitions = [...new Set([...existing.competitions, roster.code])];
+    teamsById.set(team.id, existing);
+  }));
+  const teams = [...teamsById.values()].filter(team => `${team.name} ${team.shortName || ''}`.toLowerCase().includes(search));
+  return new Response(JSON.stringify(teams.map(team => ({ id: team.id, name: team.shortName || team.name, crest: team.crest, competitions: team.competitions }))), { status: 200, headers: jsonHeaders });
+}
+
+async function getTeamCompetitionCodes(teamId, headers) {
+  const rosters = await Promise.all(footballCompetitionCodes.map(async code => ({ code, teams: await getRoster(code, headers) })));
+  return rosters.filter(roster => (roster.teams || []).some(team => team.id === teamId)).map(roster => roster.code);
+}
+
+async function getCompetitionFixtures(code, dateFrom, dateTo, headers) {
+  const query = new URLSearchParams({ dateFrom, dateTo, status: 'SCHEDULED' });
+  const { ok, payload } = await fetchProviderJson(`https://api.football-data.org/v4/competitions/${code}/matches?${query}`, headers, providerScheduleCacheTtl);
+  return ok ? payload.matches || [] : null;
+}
+
+async function getTeamFixtures(teamId, dateFrom, dateTo, headers) {
+  const apiUrl = `https://api.football-data.org/v4/teams/${teamId}/matches`;
+  const query = new URLSearchParams({ dateFrom, dateTo, status: 'SCHEDULED' });
+  const response = await fetch(`${apiUrl}?${query}`, { headers });
+  const payload = await response.json();
+  const responseHeaders = payload.message ? { ...jsonHeaders, 'cache-control': 'no-store' } : jsonHeaders;
+  return new Response(JSON.stringify({ fixtures: payload.matches || [], errors: payload.message ? { provider: payload.message } : {}, results: payload.resultSet?.count || 0 }), {
+    status: response.ok ? 200 : response.status,
+    headers: responseHeaders
+  });
 }
 
 async function getFixtures(url, headers) {
-  const apiUrl = `https://api.football-data.org/v4/teams/${Number(url.searchParams.get('team') || 57)}/matches`;
-  const query = new URLSearchParams({ dateFrom: url.searchParams.get('dateFrom') || '2026-08-01', dateTo: url.searchParams.get('dateTo') || '2027-05-30', status: 'SCHEDULED' });
-  const upstream = await fetch(`${apiUrl}?${query}`, { headers });
-  const payload = await upstream.json();
-  const responseHeaders = payload.message ? { ...jsonHeaders, 'cache-control': 'no-store' } : jsonHeaders;
-  return new Response(JSON.stringify({ fixtures: payload.matches || [], errors: payload.message ? { provider: payload.message } : {}, results: payload.resultSet?.count || 0 }), {
-    status: upstream.ok ? 200 : upstream.status,
-    headers: responseHeaders
-  });
+  const teamId = Number(url.searchParams.get('team') || 57);
+  const dateFrom = url.searchParams.get('dateFrom') || '2026-08-01';
+  const dateTo = url.searchParams.get('dateTo') || '2027-05-30';
+  const requestedCodes = (url.searchParams.get('competitions') || '').split(',').map(code => code.trim()).filter(code => footballCompetitionCodes.includes(code));
+  const competitionCodes = requestedCodes.length ? requestedCodes : await getTeamCompetitionCodes(teamId, headers);
+  if (competitionCodes.length) {
+    const schedules = await Promise.all(competitionCodes.map(code => getCompetitionFixtures(code, dateFrom, dateTo, headers)));
+    const providerUnavailable = schedules.every(matches => matches === null);
+    const fixtures = schedules
+      .flatMap(matches => matches || [])
+      .filter((match, index, all) => all.findIndex(candidate => candidate.id === match.id) === index)
+      .filter(match => match.homeTeam?.id === teamId || match.awayTeam?.id === teamId);
+    if (fixtures.length || !providerUnavailable) {
+      return new Response(JSON.stringify({ fixtures, errors: {}, results: fixtures.length, source: 'competition-cache' }), { status: 200, headers: jsonHeaders });
+    }
+  }
+  return getTeamFixtures(teamId, dateFrom, dateTo, headers);
 }
 
 export default {
