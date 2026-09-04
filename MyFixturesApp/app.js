@@ -78,7 +78,9 @@ function render() {
     const display = fixtureDisplay(fixture);
     const dateFormat = new Intl.DateTimeFormat('en-GB', { timeZone: selectedTimeZone, day: '2-digit', month: 'short' });
     const dayFormat = new Intl.DateTimeFormat('en-GB', { timeZone: selectedTimeZone, weekday: 'short' });
-    return `<article class="fixture"><div class="fixture-date"><strong>${dateFormat.format(display.date)}</strong><small>${dayFormat.format(display.date)}</small></div><div><div class="opponent">${currentTeam.name} v ${fixture.opponent}</div><div class="home-away">${fixture.home ? 'Home' : 'Away'} · ${fixture.competition}</div></div><div class="fixture-meta"><b>${display.time}</b>${fixture.venue && fixture.venue !== 'TBC' ? `<br>${fixture.venue}` : ''}</div><button class="fixture-add" data-index="${index}">＋ Google Calendar</button></article>`;
+    const kickoff = fixture.timeTbd ? 'TBD' : display.time;
+    const addButton = fixture.timeTbd ? '<button class="fixture-add fixture-add-disabled" type="button" disabled>Time TBD</button>' : `<button class="fixture-add" data-index="${index}">＋ Google Calendar</button>`;
+    return `<article class="fixture"><div class="fixture-date"><strong>${dateFormat.format(display.date)}</strong><small>${dayFormat.format(display.date)}</small></div><div><div class="opponent">${currentTeam.name} v ${fixture.opponent}</div><div class="home-away">${fixture.home ? 'Home' : 'Away'} · ${fixture.competition}</div></div><div class="fixture-meta"><b>${kickoff}</b>${fixture.venue && fixture.venue !== 'TBC' ? `<br>${fixture.venue}` : ''}</div>${addButton}</article>`;
   }).join('');
   document.querySelectorAll('.fixture-add').forEach(button => button.addEventListener('click', () => openGoogleCalendar(orderedFixtures[button.dataset.index])));
 }
@@ -104,7 +106,7 @@ async function loadLiveFixtures() {
       return { ...kickoff, utcDate: item.utcDate, opponent: item.homeTeam.id === currentTeam.id ? item.awayTeam.name : item.homeTeam.name, venue: item.venue || '', competition: item.competition.name, home: item.homeTeam.id === currentTeam.id };
     }));
     setTeamHeader();
-    const source = currentSport === 'nfl' ? '<a href="https://www.balldontlie.io/" target="_blank" rel="noreferrer">BALLDONTLIE</a>' : '<a href="https://www.football-data.org/" target="_blank" rel="noreferrer">football-data.org</a>';
+    const source = currentSport === 'nfl' && payload.provider === 'espn' ? 'ESPN schedule data' : currentSport === 'nfl' ? '<a href="https://www.balldontlie.io/" target="_blank" rel="noreferrer">BALLDONTLIE</a>' : '<a href="https://www.football-data.org/" target="_blank" rel="noreferrer">football-data.org</a>';
     sourceNote.innerHTML = `Live ${sportLabel()} schedule from ${source}. Times converted to ${timezoneLabel()}.`;
     render();
   } catch (error) {
@@ -155,7 +157,8 @@ async function addAllToGoogleCalendar() {
   googleAllButton.innerHTML = '<span>…</span> Connecting to Google';
   try {
     const token = await getGoogleAccessToken();
-    const orderedFixtures = [...fixtures].sort((first, second) => first.date.localeCompare(second.date));
+    const orderedFixtures = [...fixtures].filter(fixture => !fixture.timeTbd).sort((first, second) => first.date.localeCompare(second.date));
+    if (!orderedFixtures.length) throw new Error('All kickoff times are still TBD.');
     for (let index = 0; index < orderedFixtures.length; index += 1) {
       googleAllButton.innerHTML = `<span>…</span> Adding ${index + 1} of ${orderedFixtures.length}`;
       const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(googleCalendarEvent(orderedFixtures[index])) });
@@ -220,8 +223,9 @@ function calendarEvent(fixture) {
   return ['BEGIN:VEVENT', `UID:fixture-${fixture.date}-${fixture.opponent.replaceAll(' ', '-').toLowerCase()}@fixture`, `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}`, `DTSTART;TZID=${selectedTimeZone}:${start}`, `DTEND;TZID=${selectedTimeZone}:${end}`, `SUMMARY:${currentTeam.name} v ${escapeICS(fixture.opponent)} - ${escapeICS(fixture.competition)}`, fixture.venue ? `LOCATION:${escapeICS(fixture.venue)}` : null, `DESCRIPTION:${escapeICS(fixture.competition)} - ${currentTeam.name} ${fixture.home ? 'home' : 'away'} fixture`, 'END:VEVENT'].filter(Boolean).join('\r\n');
 }
 function downloadCalendar(selected) {
-  const content = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Fixture//Arsenal Fixtures//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', ...selected.map(calendarEvent), 'END:VCALENDAR'].join('\r\n');
-  const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([content], { type: 'text/calendar;charset=utf-8' })); link.download = selected.length === 1 ? `arsenal-${selected[0].date}.ics` : 'arsenal-fixtures.ics'; link.click(); URL.revokeObjectURL(link.href);
+  const calendarReady = selected.filter(fixture => !fixture.timeTbd);
+  const content = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Fixture//MyFixtures//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', ...calendarReady.map(calendarEvent), 'END:VCALENDAR'].join('\r\n');
+  const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([content], { type: 'text/calendar;charset=utf-8' })); link.download = selected.length === 1 ? `myfixtures-${selected[0].date}.ics` : 'myfixtures-schedule.ics'; link.click(); URL.revokeObjectURL(link.href);
 }
 document.querySelector('#export-all').addEventListener('click', () => downloadCalendar(fixtures));
 googleAllButton.addEventListener('click', addAllToGoogleCalendar);

@@ -78,10 +78,12 @@ function normalizeEspnNflGame(event, teamAbbreviation) {
   const selected = competitors.find(entry => entry.team?.abbreviation?.toLowerCase() === teamAbbreviation.toLowerCase());
   const opponent = competitors.find(entry => entry.team?.abbreviation?.toLowerCase() !== teamAbbreviation.toLowerCase());
   const seasonType = event.seasonType?.name || 'NFL';
+  const timeTbd = event.timeValid === false || competition.timeValid === false;
   return {
     id: event.id,
     sport: 'nfl',
     utcDate: event.date,
+    timeTbd,
     opponent: opponent?.team?.displayName || 'Opponent TBC',
     venue: competition.venue?.fullName || '',
     competition: event.week?.text ? `${seasonType} - ${event.week.text}` : seasonType,
@@ -93,10 +95,11 @@ function normalizeEspnNflGame(event, teamAbbreviation) {
 
 async function getEspnNflFixtures(team, dateFrom, dateTo) {
   if (!team?.abbreviation) return [];
-  const response = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${team.abbreviation.toLowerCase()}/schedule`);
-  if (!response.ok) return [];
-  const payload = await response.json();
-  return (payload.events || [])
+  const responses = await Promise.all([1, 2, 3].map(type => fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${team.abbreviation.toLowerCase()}/schedule?seasontype=${type}`)));
+  const payloads = await Promise.all(responses.filter(response => response.ok).map(response => response.json()));
+  const events = payloads.flatMap(payload => payload.events || []);
+  return events
+    .filter((event, index, all) => all.findIndex(candidate => candidate.id === event.id) === index)
     .map(event => normalizeEspnNflGame(event, team.abbreviation))
     .filter(game => {
       const gameDate = game.utcDate.slice(0, 10);
@@ -112,6 +115,8 @@ async function getNflFixtures(url, env) {
   const selectedTeam = teams?.find(team => team.id === teamId);
   const dateFrom = url.searchParams.get('dateFrom') || '2026-08-01';
   const dateTo = url.searchParams.get('dateTo') || '2027-05-30';
+  const espnGames = await getEspnNflFixtures(selectedTeam, dateFrom, dateTo);
+  if (espnGames.length) return new Response(JSON.stringify({ fixtures: espnGames, results: espnGames.length, provider: 'espn' }), { status: 200, headers: jsonHeaders });
   const seasonStartDate = new Date(`${dateFrom}T00:00:00Z`);
   const season = seasonStartDate.getUTCMonth() < 2 ? seasonStartDate.getUTCFullYear() - 1 : seasonStartDate.getUTCFullYear();
   const query = new URLSearchParams({
@@ -146,9 +151,7 @@ async function getNflFixtures(url, env) {
     const gameDate = game.utcDate.slice(0, 10);
     return game.status !== 'final' && gameDate >= dateFrom && gameDate <= dateTo;
   });
-  if (games.length) return new Response(JSON.stringify({ fixtures: games, results: games.length, provider: 'balldontlie' }), { status: 200, headers: jsonHeaders });
-  const fallbackGames = await getEspnNflFixtures(selectedTeam, dateFrom, dateTo);
-  return new Response(JSON.stringify({ fixtures: fallbackGames, results: fallbackGames.length, provider: fallbackGames.length ? 'espn' : 'balldontlie' }), { status: 200, headers: jsonHeaders });
+  return new Response(JSON.stringify({ fixtures: games, results: games.length, provider: 'balldontlie' }), { status: 200, headers: jsonHeaders });
 }
 
 export default {
