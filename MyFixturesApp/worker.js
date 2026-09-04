@@ -2,6 +2,8 @@ const rosterCache = new Map();
 const nflTeamsCache = { created: 0, teams: [] };
 const rosterCacheDuration = 30 * 60 * 1000;
 const nflTeamsCacheDuration = 12 * 60 * 60 * 1000;
+const teamSearchCacheTtl = 12 * 60 * 60;
+const fixtureCacheTtl = 60 * 60;
 const jsonHeaders = {
   'content-type': 'application/json; charset=utf-8',
   'cache-control': 'public, max-age=900',
@@ -28,6 +30,41 @@ function errorResponse(message, status = 503) {
     status,
     headers: { ...jsonHeaders, 'cache-control': 'no-store' }
   });
+}
+
+function apiCacheKey(request) {
+  const url = new URL(request.url);
+  url.searchParams.delete('_');
+  url.searchParams.delete('v');
+  return new Request(url.toString(), request);
+}
+
+function cacheableJsonResponse(response, ttlSeconds) {
+  const headers = new Headers(response.headers);
+  headers.set('cache-control', `public, max-age=${ttlSeconds}`);
+  headers.set('x-myfixtures-cache', 'MISS');
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
+function shouldCacheApiResponse(response) {
+  return response.ok && response.headers.get('content-type')?.includes('application/json') && !response.headers.get('cache-control')?.includes('no-store');
+}
+
+async function withApiCache(request, ttlSeconds, handler) {
+  if (request.method !== 'GET') return handler();
+  const cache = caches.default;
+  const key = apiCacheKey(request);
+  const cached = await cache.match(key);
+  if (cached) {
+    const headers = new Headers(cached.headers);
+    headers.set('x-myfixtures-cache', 'HIT');
+    return new Response(cached.body, { status: cached.status, statusText: cached.statusText, headers });
+  }
+  const response = await handler();
+  if (!shouldCacheApiResponse(response)) return response;
+  const cacheableResponse = cacheableJsonResponse(response, ttlSeconds);
+  await cache.put(key, cacheableResponse.clone());
+  return cacheableResponse;
 }
 
 async function getNflTeams(env) {
@@ -70,9 +107,10 @@ async function getSoccerFixtures(url, env) {
   const query = new URLSearchParams({ dateFrom: url.searchParams.get('dateFrom') || '2026-08-01', dateTo: url.searchParams.get('dateTo') || '2027-05-30', status: 'SCHEDULED' });
   const upstream = await fetch(`${apiUrl}?${query}`, { headers: { 'X-Auth-Token': env.FOOTBALL_DATA_API_KEY } });
   const payload = await upstream.json();
+  const headers = payload.message ? { ...jsonHeaders, 'cache-control': 'no-store' } : jsonHeaders;
   return new Response(JSON.stringify({ fixtures: payload.matches || [], errors: payload.message ? { provider: payload.message } : {}, results: payload.resultSet?.count || 0 }), {
     status: upstream.ok ? 200 : upstream.status,
-    headers: jsonHeaders
+    headers
   });
 }
 
@@ -169,7 +207,9 @@ export default {
     }
 
     const sport = url.searchParams.get('sport') || 'soccer';
-    if (url.pathname === '/api/teams') return sport === 'nfl' ? searchNflTeams(url, env) : searchSoccerTeams(url, env);
-    return sport === 'nfl' ? getNflFixtures(url, env) : getSoccerFixtures(url, env);
+    if (url.pathname === '/api/teams') {
+      return withApiCache(request, teamSearchCacheTtl, () => sport === 'nfl' ? searchNflTeams(url, env) : searchSoccerTeams(url, env));
+    }
+    return withApiCache(request, fixtureCacheTtl, () => sport === 'nfl' ? getNflFixtures(url, env) : getSoccerFixtures(url, env));
   }
 };
