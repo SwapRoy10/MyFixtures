@@ -62,6 +62,9 @@ function fixtureTitle(fixture) { return fixture.title || (currentSport === 'f1' 
 function fixtureDescription(fixture) { return currentSport === 'f1' ? 'Formula 1 race. Calendar duration is estimated at two hours.' : fixture.competition + ' - ' + currentTeam.name + ' ' + (fixture.home ? 'home' : 'away') + ' fixture'; }
 function setTeamHeader() {
   const isF1 = currentSport === 'f1';
+  document.querySelector('.hero-copy .eyebrow').textContent = isF1 ? 'YOUR RACEDAY, ORGANIZED' : 'Your matchday, organised';
+  document.querySelector('.hero-copy h1').innerHTML = isF1 ? 'Never miss<br><em>lights out.</em>' : 'Never miss<br><em>the kickoff.</em>';
+  document.querySelector('.hero-copy .lede').textContent = isF1 ? 'A focused calendar for all the grand prixs. Add one race or the whole season in seconds.' : 'A focused calendar for the fixtures of all your favorite teams. Add one match or the whole season in seconds.';
   document.querySelector('#club-select').disabled = isF1;
   document.querySelector('#add-fixture').hidden = isF1;
   document.querySelector('.section-label').textContent = isF1 ? 'Selected championship' : 'Selected team';
