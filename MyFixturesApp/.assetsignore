@@ -1,6 +1,14 @@
 node_modules/
+*.test.mjs
+worker.js
+DEVELOPMENT-WORKFLOW.md
 package.json
 package-lock.json
 wrangler.toml
 API-SETUP.md
 .assetsignore
+
+.wrangler/
+.dev.vars
+.env
+.env.*
