@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fixture | Arsenal calendar</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .crest { background: transparent; clip-path: none; transform: none; width: 240px; height: 240px; margin-right: 4%; }
+    .crest img { width: 200px; height: 200px; transform: none; }
+    .club-mark { display: inline-block; width: 30px; height: 30px; background: transparent; border-radius: 0; object-fit: contain; vertical-align: middle; }
+    .club-mark[alt="Formula 1 logo"] { width: 30px; height: 30px; object-fit: contain; }
+    @media (max-width: 700px) {
+      .crest { width: 150px; height: 170px; margin-right: 0; }
+      .crest img { width: 125px; height: 125px; }
+    }
+    .club-switcher { min-width: 360px; }
+    .club-search { display: flex; gap: 8px; margin: 18px 0; }
+    .club-search input { margin: 0; }
+    .club-results, .saved-clubs { display: grid; gap: 8px; }
+    .club-result, .saved-club { border: 1px solid var(--line); background: #fff; padding: 12px; display: flex; align-items: center; justify-content: space-between; text-align: left; cursor: pointer; }
+    .club-result:hover, .saved-club:hover { border-color: var(--red); }
+    .saved-club-main { border: 0; background: transparent; color: var(--ink); font: inherit; cursor: pointer; padding: 0; }
+    .saved-club-remove { border: 0; background: transparent; color: var(--red); font-size: 20px; line-height: 1; cursor: pointer; padding: 2px 6px; }
+    .saved-club-remove:hover { color: var(--ink); }
+    .club-result-main, .saved-club-main { display: flex; align-items: center; gap: 10px; }
+    .team-mini-crest { width: 28px; height: 28px; object-fit: contain; }
+    .saved-heading { margin: 20px 0 8px; font: 11px 'DM Mono', monospace; color: var(--muted); text-transform: uppercase; }
+    .club-switcher .button { white-space: nowrap; }
+    .brand-group { display: flex; align-items: center; gap: 18px; }
+    .sport-select { border: 0; border-left: 1px solid var(--line); background: transparent; color: var(--muted); padding: 3px 0 3px 18px; min-width: 88px; font: 11px 'DM Mono', monospace; text-transform: uppercase; letter-spacing: .05em; cursor: pointer; outline-color: var(--red); }
+    .sport-select:hover, .sport-select:focus { color: var(--ink); }
+    .team-initials { display: inline-grid; place-items: center; width: 30px; height: 30px; background: var(--ink); color: #fff; font: 11px 'DM Mono', monospace; vertical-align: middle; margin-right: 9px; }
+    .team-mini-initials { display: inline-grid; place-items: center; width: 28px; height: 28px; background: var(--ink); color: #fff; font: 10px 'DM Mono', monospace; }
+    .team-mini-crest, .club-result .team-mini-crest, .saved-club .team-mini-crest { width: 30px; height: 30px; object-fit: contain; flex: 0 0 30px; }
+    .fixture-past { opacity: .48; filter: grayscale(1); }
+    .fixture-past .opponent, .fixture-past .fixture-meta b { color: var(--muted); }
+    .fixture-add-disabled, .fixture-add-disabled:hover { background: var(--line); color: var(--muted); cursor: not-allowed; transform: none; }
+    @media (max-width: 700px) { .club-switcher { min-width: 0; } .brand-group { gap: 10px; } .sport-select { min-width: 74px; padding-left: 10px; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand-group"><a class="brand" href="#">MyFixtures</a><select class="sport-select" id="sport-select" aria-label="Choose sport"><option value="soccer">Soccer</option><option value="nfl">NFL</option><option value="f1">Formula 1</option></select></div>
+      <div class="topbar-meta"><span class="live-dot"></span><span>Current season</span><span class="divider"></span><select id="timezone-select" aria-label="Choose time zone"><option value="America/New_York">Eastern Time</option><option value="America/Chicago">Central Time</option><option value="America/Denver">Mountain Time</option><option value="America/Los_Angeles">Pacific Time</option><option value="Europe/London">British Summer Time</option></select></div>
+    </header>
+
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Your matchday, organised</p>
+        <h1>Never miss<br><em>the kickoff.</em></h1>
+        <p class="lede">A focused calendar for the fixtures of all your favorite teams. Add one match or the whole season in seconds.</p>
+      </div>
+    </section>
+
+    <section class="controls" aria-label="Fixture controls">
+      <div>
+        <p class="section-label">Selected team</p>
+        <button class="club-select" id="club-select" type="button"><span id="team-mark-wrapper"><img class="club-mark" id="club-mark" src="https://crests.football-data.org/57.png" alt="Arsenal crest"></span> <span id="club-name">Arsenal</span> <span class="chevron">⌄</span></button>
+      </div>
+      <div class="control-actions">
+        <button id="add-fixture" class="button button-outline" type="button"><span>＋</span> Add fixture</button>
+        <button id="google-all" class="button button-solid" type="button"><span>＋</span> Add all to Google Calendar</button>
+        <button id="export-all" class="button button-outline" type="button"><span>↓</span> Download all</button>
+      </div>
+    </section>
+
+    <section class="fixture-section">
+      <div class="section-heading"><div><p class="eyebrow">Current season</p><h2>Every team. <span>Every match.</span></h2></div><p class="timezone" id="timezone-label">Times shown in Eastern Time</p></div>
+      <div id="fixture-list" class="fixture-list"></div>
+      <p class="source-note" id="source-note">Schedule source: <a href="https://www.arsenal.com/fixtures/men/fixtures" target="_blank" rel="noreferrer">Arsenal.com fixtures</a>. TBC rows await official publication.</p>
+    </section>
+
+    <section class="how-it-works"><span class="step-number">01</span><p><strong>Calendar-ready files</strong><br>Downloads open in Apple Calendar, Google Calendar, Outlook, and more.</p><span class="step-line"></span><span class="step-number">02</span><p><strong>Stay in the loop</strong><br>Fixture details live here, while your calendar handles the reminder.</p></section>
+
+    <footer><span>MyFixtures</span><span>Built for matchday people</span></footer>
+  </main>
+
+  <dialog id="fixture-dialog">
+    <form method="dialog" id="fixture-form">
+      <button class="close-dialog" id="close-dialog" type="button" aria-label="Close">×</button>
+      <p class="eyebrow">Manual entry</p><h2>Add a fixture</h2>
+      <label>Opponent<input name="opponent" required placeholder="e.g. Chelsea"></label>
+      <label>Competition<input name="competition" required placeholder="e.g. Premier League"></label>
+      <div class="form-row"><label>Date<input name="date" type="date" required></label><label>Kickoff<input name="time" type="time" required value="15:00"></label></div>
+      <label>Venue<input name="venue" placeholder="e.g. Emirates Stadium"></label>
+      <button class="button button-solid submit" value="default">Add fixture</button>
+    </form>
+  </dialog>
+  <dialog id="club-dialog" class="club-switcher">
+    <form method="dialog" id="club-search-form">
+      <button class="close-dialog" id="close-club-dialog" type="button" aria-label="Close">×</button>
+      <p class="eyebrow">Team list</p><h2>Choose a team</h2>
+      <div class="club-search"><input id="club-search-input" name="search" placeholder="Search teams" autocomplete="off"><button class="button button-solid" type="submit">Search</button></div>
+      <div id="club-results" class="club-results"></div>
+      <p class="saved-heading">Saved clubs</p><div id="saved-clubs" class="saved-clubs"></div>
+    </form>
+  </dialog>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="app.js?v=20260915-confirmed-times-1"></script>
+</body>
+</html>
