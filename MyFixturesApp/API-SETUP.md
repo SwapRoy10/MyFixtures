@@ -23,7 +23,7 @@ npx wrangler deploy
 
 5. Open the deployed Worker URL. It serves both the static app and `/api/fixtures`.
 
-The worker requests soccer schedules from football-data.org, then supplements missing domestic cup, Europa League, and Conference League fixtures with ESPN's public schedules. NFL schedules prefer ESPN and fall back to BALLDONTLIE. Played fixtures remain visible so each supported season is complete; the browser converts UTC timestamps to the selected time zone and includes the competition or league in each calendar event.
+The worker requests soccer schedules from football-data.org, cross-checks supported league kickoff times with ESPN, and supplements missing domestic cup, Europa League, and Conference League fixtures from ESPN's public schedules. A football-data.org placeholder is replaced only when ESPN marks the kickoff time as valid; otherwise the game remains honestly labeled TBD until its league confirms it. NFL schedules prefer ESPN and fall back to BALLDONTLIE. Played fixtures remain visible so each supported season is complete; the browser converts UTC timestamps to the selected time zone and includes the competition or league in each calendar event.
 
 For the development Worker, set both secrets on the development Worker too:
 

@@ -8,6 +8,17 @@ const providerRosterCacheTtl = 12 * 60 * 60;
 const providerScheduleCacheTtl = 60 * 60;
 const footballCompetitionCodes = ['PL', 'CL', 'EL', 'FAC', 'FLC', 'ELC', 'SA', 'PPL', 'DED', 'PD', 'CDR', 'BL1', 'DFB', 'FL1'];
 const footballRosterCompetitionCodes = ['PL', 'CL', 'ELC', 'SA', 'PPL', 'DED', 'PD', 'BL1', 'FL1'];
+const espnSoccerLeagues = [
+  { code: 'PL', slug: 'eng.1' },
+  { code: 'CL', slug: 'uefa.champions' },
+  { code: 'ELC', slug: 'eng.2' },
+  { code: 'SA', slug: 'ita.1' },
+  { code: 'PPL', slug: 'por.1' },
+  { code: 'DED', slug: 'ned.1' },
+  { code: 'PD', slug: 'esp.1' },
+  { code: 'BL1', slug: 'ger.1' },
+  { code: 'FL1', slug: 'fra.1' }
+];
 const espnSoccerSupplements = [
   { slug: 'eng.fa', domesticCodes: ['PL', 'ELC'] },
   { slug: 'eng.league_cup', domesticCodes: ['PL', 'ELC'] },
@@ -148,7 +159,8 @@ function normalizedIdentity(value) {
 function teamAliases(values) {
   return new Set(values.flatMap(value => {
     const normalized = normalizedIdentity(value);
-    return normalized ? [normalized, normalized.replace(/^the /, '')] : [];
+    const simplified = normalized.replace(/\b(the|de|do|da|del|clube|football|futbol)\b/g, ' ').replace(/\s+/g, ' ').trim();
+    return normalized ? [normalized, normalized.replace(/^the /, ''), simplified] : [];
   }));
 }
 
@@ -168,13 +180,14 @@ function normalizeFootballDataMatch(match, teamId) {
     opponent: opponent?.shortName || opponent?.name || 'Opponent TBC',
     venue: match.venue || '',
     competition: match.competition?.name || 'Soccer',
+    competitionCode: match.competition?.code || '',
     home: selectedIsHome,
     status: String(match.status || 'scheduled').toLowerCase(),
     provider: 'football-data'
   };
 }
 
-function normalizeEspnSoccerMatch(event, aliases, leagueName) {
+function normalizeEspnSoccerMatch(event, aliases, leagueName, competitionCode = '') {
   const competition = event.competitions?.[0] || {};
   const competitors = competition.competitors || [];
   const selected = competitors.find(entry => espnTeamMatches(entry.team, aliases));
@@ -188,6 +201,7 @@ function normalizeEspnSoccerMatch(event, aliases, leagueName) {
     opponent: opponent?.team?.shortDisplayName || opponent?.team?.displayName || 'Opponent TBC',
     venue: competition.venue?.fullName || '',
     competition: event.league?.name || leagueName || 'Soccer',
+    competitionCode,
     home: selected.homeAway === 'home',
     status: event.status?.type?.state || 'scheduled',
     provider: 'espn'
@@ -195,11 +209,12 @@ function normalizeEspnSoccerMatch(event, aliases, leagueName) {
 }
 
 async function getEspnSoccerFixtures(competitionCodes, dateFrom, dateTo, aliases) {
+  const primary = espnSoccerLeagues.filter(entry => competitionCodes.includes(entry.code));
   const domestic = espnSoccerSupplements.filter(entry => entry.domesticCodes.length && entry.domesticCodes.some(code => competitionCodes.includes(code)));
   const european = competitionCodes.includes('CL') ? [] : espnSoccerSupplements.filter(entry => !entry.domesticCodes.length);
-  const supplements = [...domestic, ...european];
+  const schedulesToFetch = [...primary, ...domestic, ...european];
   const years = [...new Set([dateFrom.slice(0, 4), dateTo.slice(0, 4)])];
-  const schedules = await Promise.all(supplements.flatMap(entry => years.map(async year => {
+  const schedules = await Promise.all(schedulesToFetch.flatMap(entry => years.map(async year => {
     try {
       const query = new URLSearchParams({ dates: year, limit: '500' });
       const result = await fetchProviderJson(`https://site.web.api.espn.com/apis/site/v2/sports/soccer/${entry.slug}/scoreboard?${query}`, { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0 (compatible; MyFixtures/1.0)' }, providerScheduleCacheTtl);
@@ -207,13 +222,43 @@ async function getEspnSoccerFixtures(competitionCodes, dateFrom, dateTo, aliases
       const leagueName = result.payload.leagues?.[0]?.name;
       return (result.payload.events || [])
         .filter(event => event.date?.slice(0, 10) >= dateFrom && event.date?.slice(0, 10) <= dateTo)
-        .map(event => normalizeEspnSoccerMatch(event, aliases, leagueName))
+        .map(event => normalizeEspnSoccerMatch(event, aliases, leagueName, entry.code))
         .filter(Boolean);
     } catch {
       return [];
     }
   })));
   return schedules.flat();
+}
+
+function mergeSoccerFixtures(footballFixtures, espnFixtures) {
+  const unmatchedEspn = [...espnFixtures];
+  const mergedFootball = footballFixtures.map(fixture => {
+    const matchIndex = unmatchedEspn.findIndex(candidate => {
+      if (!candidate.competitionCode || candidate.competitionCode !== fixture.competitionCode || candidate.home !== fixture.home) return false;
+      const sameDate = candidate.utcDate?.slice(0, 10) === fixture.utcDate?.slice(0, 10);
+      const footballOpponent = normalizedIdentity(fixture.opponent);
+      const espnOpponent = normalizedIdentity(candidate.opponent);
+      const sameOpponent = footballOpponent === espnOpponent
+        || footballOpponent.startsWith(`${espnOpponent} `)
+        || espnOpponent.startsWith(`${footballOpponent} `);
+      return sameDate || sameOpponent;
+    });
+    if (matchIndex < 0) return fixture;
+
+    const espnFixture = unmatchedEspn.splice(matchIndex, 1)[0];
+    if (!fixture.timeTbd || espnFixture.timeTbd) {
+      return { ...fixture, venue: fixture.venue || espnFixture.venue };
+    }
+    return {
+      ...fixture,
+      utcDate: espnFixture.utcDate,
+      timeTbd: false,
+      venue: fixture.venue || espnFixture.venue,
+      provider: 'football-data+espn'
+    };
+  });
+  return uniqueFixtures([...mergedFootball, ...unmatchedEspn]);
 }
 
 function uniqueFixtures(fixtures) {
@@ -263,7 +308,7 @@ async function getSoccerFixtures(url, env) {
   });
   const aliases = teamAliases(aliasValues);
   const knownCompetitionCodes = [...new Set([...competitionCodes, ...teamFixtures.map(match => match.competition?.code).filter(Boolean)])];
-  const supplementalFixtures = aliases.size ? await getEspnSoccerFixtures(knownCompetitionCodes, dateFrom, dateTo, aliases) : [];
+  const espnFixtures = aliases.size ? await getEspnSoccerFixtures(knownCompetitionCodes, dateFrom, dateTo, aliases) : [];
 
   if (competitionCodes.length) {
     const schedules = await Promise.all(competitionCodes.map(code => getCompetitionFixtures(code, dateFrom, dateTo, headers)));
@@ -271,19 +316,21 @@ async function getSoccerFixtures(url, env) {
     const competitionFixtures = schedules
       .flatMap(matches => matches || [])
       .filter(match => match.homeTeam?.id === teamId || match.awayTeam?.id === teamId);
-    const fixtures = uniqueFixtures([...competitionFixtures, ...teamFixtures].map(match => normalizeFootballDataMatch(match, teamId)).concat(supplementalFixtures));
+    const footballFixtures = uniqueFixtures([...competitionFixtures, ...teamFixtures].map(match => normalizeFootballDataMatch(match, teamId)));
+    const fixtures = mergeSoccerFixtures(footballFixtures, espnFixtures);
     if (fixtures.length || !providerUnavailable) {
-      return new Response(JSON.stringify({ fixtures, errors: {}, results: fixtures.length, source: supplementalFixtures.length ? 'football-data+espn' : 'football-data' }), { status: 200, headers: jsonHeaders });
+      return new Response(JSON.stringify({ fixtures, errors: {}, results: fixtures.length, source: espnFixtures.length ? 'football-data+espn' : 'football-data' }), { status: 200, headers: jsonHeaders });
     }
   }
 
   if (teamFixturePayload.ok) {
-    const fixtures = uniqueFixtures(teamFixtures.map(match => normalizeFootballDataMatch(match, teamId)).concat(supplementalFixtures));
-    return new Response(JSON.stringify({ fixtures, errors: {}, results: fixtures.length, source: supplementalFixtures.length ? 'football-data+espn' : 'football-data' }), { status: 200, headers: jsonHeaders });
+    const footballFixtures = uniqueFixtures(teamFixtures.map(match => normalizeFootballDataMatch(match, teamId)));
+    const fixtures = mergeSoccerFixtures(footballFixtures, espnFixtures);
+    return new Response(JSON.stringify({ fixtures, errors: {}, results: fixtures.length, source: espnFixtures.length ? 'football-data+espn' : 'football-data' }), { status: 200, headers: jsonHeaders });
   }
 
-  if (supplementalFixtures.length) {
-    const fixtures = uniqueFixtures(supplementalFixtures);
+  if (espnFixtures.length) {
+    const fixtures = uniqueFixtures(espnFixtures);
     return new Response(JSON.stringify({ fixtures, errors: {}, results: fixtures.length, source: 'espn' }), { status: 200, headers: jsonHeaders });
   }
 
