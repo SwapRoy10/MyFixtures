@@ -2,9 +2,9 @@
 
 ## Formula 1
 
-Choose Formula 1 in the sport selector to load the current calendar year's Grand Prix races. This championship-wide schedule uses BALLDONTLIE `/f1/v1/events?season=YEAR` and `/f1/v1/sessions?type=Race&event_ids[]=ID`, including cursor pagination. Practice, qualifying and sprint sessions are not included in this first integration.
+Choose Formula 1 in the sport selector to load the current calendar year's Grand Prix races. The schedule prefers the free Jolpica F1 race feed and falls back to BALLDONTLIE `/f1/v1/events?season=YEAR` and `/f1/v1/sessions?type=Race&event_ids[]=ID`, including cursor pagination. Practice, qualifying and sprint sessions are not included.
 
-The existing server-side `BALLDONTLIE_API_KEY` is reused. Race session times require F1 ALL-STAR or GOAT access; an NFL subscription does not grant F1 access. See https://f1.balldontlie.io/#sessions. Errors are shown instead of substituting weekend start dates for race times. Calendar entries use an estimated two-hour duration.
+`BALLDONTLIE_API_KEY` is optional while Jolpica is available. Its race session times require F1 ALL-STAR or GOAT access; an NFL subscription does not grant F1 access. See https://f1.balldontlie.io/#sessions. Errors are shown instead of substituting weekend start dates for race times. Calendar entries use an estimated two-hour duration.
 
 Test locally with `npm test`. For live development testing, configure `BALLDONTLIE_API_KEY` on `my-fixtures-api-development`, or in an untracked `.dev.vars` file for `npm run preview`. Select Formula 1 and check race titles, local times, and calendar exports. Do not deploy to the default production Worker when testing this change.
 
