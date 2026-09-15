@@ -22,7 +22,7 @@ const fixtures = [
   { date: '2027-05-15', time: '15:00', opponent: 'TBC', venue: 'TBC', competition: 'Premier League', home: false },
   { date: '2027-05-30', time: '16:00', opponent: 'TBC', venue: 'TBC', competition: 'Season final', home: true }
 ];
-const appRelease = '20260915-complete-fixtures-1';
+const appRelease = '20260915-complete-fixtures-2';
 const fallbackFixtures = [...fixtures];
 const f1Selection = { id: 'f1', sport: 'f1', name: 'Formula 1', abbreviation: 'F1', crest: 'https://city-png.b-cdn.net/thumbnail/thumbnail_public/uploads/preview/hd-f1-the-official-formula-1-transparent-png-701751712229525ajvwddtfme.png?v=2025092211' };
 let fixtureLoadId = 0;

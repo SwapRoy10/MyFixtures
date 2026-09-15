@@ -196,13 +196,13 @@ function normalizeEspnSoccerMatch(event, aliases, leagueName) {
 
 async function getEspnSoccerFixtures(competitionCodes, dateFrom, dateTo, aliases) {
   const domestic = espnSoccerSupplements.filter(entry => entry.domesticCodes.length && entry.domesticCodes.some(code => competitionCodes.includes(code)));
-  const european = espnSoccerSupplements.filter(entry => !entry.domesticCodes.length);
+  const european = competitionCodes.includes('CL') ? [] : espnSoccerSupplements.filter(entry => !entry.domesticCodes.length);
   const supplements = [...domestic, ...european];
   const years = [...new Set([dateFrom.slice(0, 4), dateTo.slice(0, 4)])];
   const schedules = await Promise.all(supplements.flatMap(entry => years.map(async year => {
     try {
-      const query = new URLSearchParams({ dates: year, limit: '1000' });
-      const result = await fetchProviderJson(`https://site.api.espn.com/apis/site/v2/sports/soccer/${entry.slug}/scoreboard?${query}`, {}, providerScheduleCacheTtl);
+      const query = new URLSearchParams({ dates: year, limit: '500' });
+      const result = await fetchProviderJson(`https://site.web.api.espn.com/apis/site/v2/sports/soccer/${entry.slug}/scoreboard?${query}`, { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0 (compatible; MyFixtures/1.0)' }, providerScheduleCacheTtl);
       if (!result.ok) return [];
       const leagueName = result.payload.leagues?.[0]?.name;
       return (result.payload.events || [])
@@ -262,7 +262,8 @@ async function getSoccerFixtures(url, env) {
     if (selected) aliasValues.push(selected.name, selected.shortName, selected.tla);
   });
   const aliases = teamAliases(aliasValues);
-  const supplementalFixtures = aliases.size ? await getEspnSoccerFixtures(competitionCodes, dateFrom, dateTo, aliases) : [];
+  const knownCompetitionCodes = [...new Set([...competitionCodes, ...teamFixtures.map(match => match.competition?.code).filter(Boolean)])];
+  const supplementalFixtures = aliases.size ? await getEspnSoccerFixtures(knownCompetitionCodes, dateFrom, dateTo, aliases) : [];
 
   if (competitionCodes.length) {
     const schedules = await Promise.all(competitionCodes.map(code => getCompetitionFixtures(code, dateFrom, dateTo, headers)));
@@ -337,7 +338,9 @@ async function getEspnNflFixtures(team, dateFrom, dateTo) {
   if (!team?.abbreviation) return [];
   const rangeStart = new Date(`${dateFrom}T00:00:00Z`);
   const season = rangeStart.getUTCMonth() < 2 ? rangeStart.getUTCFullYear() - 1 : rangeStart.getUTCFullYear();
-  const responses = await Promise.all([1, 2, 3].map(type => fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${team.abbreviation.toLowerCase()}/schedule?season=${season}&seasontype=${type}`)));
+  const responses = await Promise.all([1, 2, 3].map(type => fetch(`https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/teams/${team.abbreviation.toLowerCase()}/schedule?season=${season}&seasontype=${type}`, {
+    headers: { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0 (compatible; MyFixtures/1.0)' }
+  })));
   const payloads = await Promise.all(responses.filter(response => response.ok).map(response => response.json()));
   const events = payloads.flatMap(payload => payload.events || []);
   return events
