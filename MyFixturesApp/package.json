@@ -2,7 +2,7 @@
   "name": "my-fixtures-app",
   "private": true,
   "scripts": {
-    "test": "node --test f1.test.mjs",
+    "test": "node --test",
     "deploy": "wrangler deploy",
     "preview": "wrangler dev"
   },

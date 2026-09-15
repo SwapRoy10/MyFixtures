@@ -22,7 +22,7 @@ const fixtures = [
   { date: '2027-05-15', time: '15:00', opponent: 'TBC', venue: 'TBC', competition: 'Premier League', home: false },
   { date: '2027-05-30', time: '16:00', opponent: 'TBC', venue: 'TBC', competition: 'Season final', home: true }
 ];
-const appRelease = '20260904-f1-1';
+const appRelease = '20260915-complete-fixtures-1';
 const fallbackFixtures = [...fixtures];
 const f1Selection = { id: 'f1', sport: 'f1', name: 'Formula 1', abbreviation: 'F1', crest: 'https://city-png.b-cdn.net/thumbnail/thumbnail_public/uploads/preview/hd-f1-the-official-formula-1-transparent-png-701751712229525ajvwddtfme.png?v=2025092211' };
 let fixtureLoadId = 0;
@@ -50,6 +50,16 @@ timezoneSelect.value = selectedTimeZone;
 sportSelect.value = currentSport;
 function timezoneLabel() { return timezoneSelect.options[timezoneSelect.selectedIndex].text; }
 function sportLabel() { return currentSport === 'f1' ? 'Formula 1' : currentSport === 'nfl' ? 'NFL' : 'Soccer'; }
+function currentSeason() {
+  const now = new Date();
+  const startYear = now.getUTCMonth() >= 6 ? now.getUTCFullYear() : now.getUTCFullYear() - 1;
+  return { startYear, endYear: startYear + 1, label: `${String(startYear).slice(-2)}/${String(startYear + 1).slice(-2)}` };
+}
+function fixtureDateRange() {
+  const season = currentSeason();
+  if (currentSport === 'f1') return `dateFrom=${new Date().getUTCFullYear()}-01-01&dateTo=${new Date().getUTCFullYear()}-12-31`;
+  return `dateFrom=${season.startYear}-07-01&dateTo=${season.endYear}-06-30`;
+}
 function nflLogoUrl(abbreviation) { return `https://a.espncdn.com/i/teamlogos/nfl/500/${abbreviation.toLowerCase()}.png`; }
 function teamInitials(team) { return (team.abbreviation || team.name || 'TM').split(/\s+/).map(part => part[0]).join('').slice(0, 3).toUpperCase(); }
 function teamMark(team, mini = false) {
@@ -62,14 +72,15 @@ function fixtureTitle(fixture) { return fixture.title || (currentSport === 'f1' 
 function fixtureDescription(fixture) { return currentSport === 'f1' ? 'Formula 1 race. Calendar duration is estimated at two hours.' : fixture.competition + ' - ' + currentTeam.name + ' ' + (fixture.home ? 'home' : 'away') + ' fixture'; }
 function setTeamHeader() {
   const isF1 = currentSport === 'f1';
+  const season = currentSeason();
   document.querySelector('.hero-copy .eyebrow').textContent = isF1 ? 'YOUR RACEDAY, ORGANIZED' : 'Your matchday, organised';
   document.querySelector('.hero-copy h1').innerHTML = isF1 ? 'Never miss<br><em>lights out.</em>' : 'Never miss<br><em>the kickoff.</em>';
   document.querySelector('.hero-copy .lede').textContent = isF1 ? 'A focused calendar for all the grand prixs. Add one race or the whole season in seconds.' : 'A focused calendar for the fixtures of all your favorite teams. Add one match or the whole season in seconds.';
   document.querySelector('#club-select').disabled = isF1;
   document.querySelector('#add-fixture').hidden = isF1;
   document.querySelector('.section-label').textContent = isF1 ? 'Selected championship' : 'Selected team';
-  document.querySelector('.topbar-meta > span:nth-child(2)').textContent = isF1 ? 'Season ' + new Date().getUTCFullYear() : 'Season 26/27';
-  document.querySelector('.section-heading .eyebrow').textContent = isF1 ? new Date().getUTCFullYear() + ' Formula 1 season' : '2026/27 season - through May 30';
+  document.querySelector('.topbar-meta > span:nth-child(2)').textContent = isF1 ? 'Season ' + new Date().getUTCFullYear() : `Season ${season.label}`;
+  document.querySelector('.section-heading .eyebrow').textContent = isF1 ? new Date().getUTCFullYear() + ' Formula 1 season' : `${season.label} season - July through June`;
   document.querySelector('.section-heading h2').textContent = isF1 ? 'Every Grand Prix.' : 'Every team. Every match.';
   document.title = 'MyFixtures | ' + currentTeam.name + ' calendar';
   document.querySelector('#club-name').textContent = currentTeam.name;
@@ -129,10 +140,10 @@ function formatFixtureForSelectedZone(timestamp) {
 async function loadLiveFixtures() {
   const loadId = ++fixtureLoadId;
   try {
-    const year = new Date().getUTCFullYear();
-    const dateRange = currentSport === 'f1' ? 'dateFrom=' + year + '-01-01&dateTo=' + year + '-12-31' : 'dateFrom=2026-08-01&dateTo=2027-05-30';
+    const dateRange = fixtureDateRange();
     const competitions = Array.isArray(currentTeam.competitions) && currentTeam.competitions.length ? `&competitions=${encodeURIComponent(currentTeam.competitions.join(','))}` : '';
-    const response = await fetch(`/api/fixtures?sport=${encodeURIComponent(currentSport)}&team=${currentTeam.id}&${dateRange}${competitions}&release=${appRelease}`);
+    const identity = `&teamName=${encodeURIComponent(currentTeam.fullName || currentTeam.name || '')}&teamAbbreviation=${encodeURIComponent(currentTeam.abbreviation || '')}`;
+    const response = await fetch(`/api/fixtures?sport=${encodeURIComponent(currentSport)}&team=${currentTeam.id}&${dateRange}${competitions}${identity}&release=${appRelease}`);
     const payload = await response.json();
     if (loadId !== fixtureLoadId) return;
     if (!response.ok) throw new Error(payload.error || `Fixture API returned ${response.status}`);
@@ -147,7 +158,7 @@ async function loadLiveFixtures() {
       return { ...kickoff, utcDate: item.utcDate, opponent: item.homeTeam.id === currentTeam.id ? item.awayTeam.name : item.homeTeam.name, venue: item.venue || '', competition: item.competition.name, home: item.homeTeam.id === currentTeam.id };
     }));
     setTeamHeader();
-    const source = currentSport === 'nfl' && payload.provider === 'espn' ? 'ESPN schedule data' : currentSport === 'f1' && payload.provider === 'jolpica' ? '<a href="https://github.com/jolpica/jolpica-f1" target="_blank" rel="noreferrer">Jolpica F1</a>' : (currentSport === 'nfl' || currentSport === 'f1') ? '<a href="https://www.balldontlie.io/" target="_blank" rel="noreferrer">BALLDONTLIE</a>' : '<a href="https://www.football-data.org/" target="_blank" rel="noreferrer">football-data.org</a>';
+    const source = currentSport === 'soccer' && payload.source === 'football-data+espn' ? '<a href="https://www.football-data.org/" target="_blank" rel="noreferrer">football-data.org</a> and ESPN' : currentSport === 'soccer' && payload.source === 'espn' ? 'ESPN schedule data' : currentSport === 'nfl' && payload.provider === 'espn' ? 'ESPN schedule data' : currentSport === 'f1' && payload.provider === 'jolpica' ? '<a href="https://github.com/jolpica/jolpica-f1" target="_blank" rel="noreferrer">Jolpica F1</a>' : (currentSport === 'nfl' || currentSport === 'f1') ? '<a href="https://www.balldontlie.io/" target="_blank" rel="noreferrer">BALLDONTLIE</a>' : '<a href="https://www.football-data.org/" target="_blank" rel="noreferrer">football-data.org</a>';
     sourceNote.innerHTML = `Live ${sportLabel()} schedule from ${source}. Times converted to ${timezoneLabel()}.`;
     if (currentSport === 'f1' && !liveFixtures.length) sourceNote.textContent = 'No upcoming Grand Prix races are available for this season.';
     render();

@@ -23,7 +23,7 @@ npx wrangler deploy
 
 5. Open the deployed Worker URL. It serves both the static app and `/api/fixtures`.
 
-The worker requests soccer schedules from football-data.org and NFL schedules from BALLDONTLIE. It returns every competition or game made available to your provider plan. The browser converts UTC timestamps to the selected time zone and includes the competition or league in each calendar event.
+The worker requests soccer schedules from football-data.org, then supplements missing domestic cup, Europa League, and Conference League fixtures with ESPN's public schedules. NFL schedules prefer ESPN and fall back to BALLDONTLIE. Played fixtures remain visible so each supported season is complete; the browser converts UTC timestamps to the selected time zone and includes the competition or league in each calendar event.
 
 For the development Worker, set both secrets on the development Worker too:
 
