@@ -251,7 +251,7 @@ async function loadLiveFixtures() {
     }));
     setTeamHeader();
     const source = currentSport === 'nhl' ? '<a href="https://www.nhl.com/schedule" target="_blank" rel="noreferrer">NHL</a>' : currentSport === 'soccer' && payload.source === 'football-data+espn' ? '<a href="https://www.football-data.org/" target="_blank" rel="noreferrer">football-data.org</a> and ESPN' : currentSport === 'soccer' && payload.source === 'espn' ? 'ESPN schedule data' : currentSport === 'nfl' && payload.provider === 'espn' ? 'ESPN schedule data' : currentSport === 'f1' && payload.provider === 'jolpica' ? '<a href="https://github.com/jolpica/jolpica-f1" target="_blank" rel="noreferrer">Jolpica F1</a>' : ['nfl', 'f1', 'mlb', 'nba'].includes(currentSport) ? '<a href="https://www.balldontlie.io/" target="_blank" rel="noreferrer">BALLDONTLIE</a>' : '<a href="https://www.football-data.org/" target="_blank" rel="noreferrer">football-data.org</a>';
-    sourceNote.innerHTML = `Live ${sportLabel()} schedule from ${source}. Times converted to ${timezoneLabel()}.${currentSport === 'mlb' ? ' Showing games from today forward, including determined postseason matchups.' : ''}`;
+    sourceNote.innerHTML = `Live ${sportLabel()} schedule from ${source}. Times shown in your selected time zone.${currentSport === 'mlb' ? ' Showing games from today forward, including determined postseason matchups.' : ''}`;
     if (currentSport === 'f1' && !liveFixtures.length) sourceNote.textContent = 'No upcoming Grand Prix races are available for this season.';
     if (currentSport === 'mlb' && !liveFixtures.length) sourceNote.textContent = 'No remaining MLB games are currently scheduled for this team.';
     if (currentSport === 'nhl') {
