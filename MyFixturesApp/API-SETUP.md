@@ -1,5 +1,19 @@
 # Live schedule API setup
 
+## NBA
+
+Select NBA to search and save current NBA teams. The default team is the Philadelphia 76ers. Schedules span July 1 through June 30, using the starting year as BALLDONTLIE's season identifier (2026 for 2026-27).
+
+The existing `BALLDONTLIE_API_KEY` is used server-side for the free `/v1/teams` and `/v1/games` endpoints. Game requests follow all cursor pages with 100 results per page. The default games query includes regular-season, NBA Cup, Play-In and playoff games; a separate `season_type=preseason` query includes preseason. Team and date filters are applied, and duplicates/cancellations are removed. A failed page or preseason request returns an explicit error, never a successful partial schedule. Team responses are cached for 12 hours and game responses for one hour. Free-tier traffic is limited to five provider requests per minute; rapid requests for several uncached teams can require a retry.
+
+Confirmed times use the provider's `datetime` UTC timestamp. Missing, postponed or unconfirmed times stay TBD and are excluded from calendar actions. NBA date-only games retain their scheduled calendar date when the viewer changes time zones. Completed games remain visible, matching soccer and NFL behavior. Google Calendar and ICS exports include every confirmed upcoming game, with an estimated 150-minute duration.
+
+BALLDONTLIE does not currently document an arena field for NBA games. ESPN supplies optional venue details matched on opponent, home/away status and Eastern calendar date. Venue-feed failures do not remove NBA games or invent arenas. ESPN is not used to replace NBA kickoff times.
+
+The initial 2026-27 NBA schedule has 80 defined regular-season opponents per team. The remaining two depend on NBA Cup outcomes. Undetermined Cup and playoff fixtures are included when the provider publishes them, rather than creating speculative matches. Provider reference: https://docs.balldontlie.io/.
+
+Run `npm test` for NBA pagination, normalization, failure handling and browser calendar-export checks. Both individual and bulk calendar actions use the same Google setup below; include the development site's origin when testing bulk additions.
+
 ## Major League Baseball
 
 Choose MLB in the sport selector to search all MLB teams and load games scheduled from the current day through the end of the calendar year. The Worker uses the BALLDONTLIE MLB `/mlb/v1/teams` and `/mlb/v1/games` endpoints with cursor pagination, so it retrieves more than the first 100 games when necessary. Regular-season and already-determined postseason games are included; completed and cancelled games are omitted.

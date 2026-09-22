@@ -42,7 +42,7 @@
 <body>
   <main class="shell">
     <header class="topbar">
-      <div class="brand-group"><a class="brand" href="#">MyFixtures</a><select class="sport-select" id="sport-select" aria-label="Choose sport"><option value="soccer">Soccer</option><option value="nfl">NFL</option><option value="mlb">MLB</option><option value="f1">Formula 1</option></select></div>
+      <div class="brand-group"><a class="brand" href="#">MyFixtures</a><select class="sport-select" id="sport-select" aria-label="Choose sport"><option value="soccer">Soccer</option><option value="nfl">NFL</option><option value="mlb">MLB</option><option value="nba">NBA</option><option value="f1">Formula 1</option></select></div>
       <div class="topbar-meta"><span class="live-dot"></span><span>Current season</span><span class="divider"></span><select id="timezone-select" aria-label="Choose time zone"><option value="America/New_York">Eastern Time</option><option value="America/Chicago">Central Time</option><option value="America/Denver">Mountain Time</option><option value="America/Los_Angeles">Pacific Time</option><option value="Europe/London">British Summer Time</option></select></div>
     </header>
 
@@ -83,7 +83,7 @@
       <p class="eyebrow">Manual entry</p><h2>Add a fixture</h2>
       <label>Opponent<input name="opponent" required placeholder="e.g. Chelsea"></label>
       <label>Competition<input name="competition" required placeholder="e.g. Premier League"></label>
-      <div class="form-row"><label>Date<input name="date" type="date" required></label><label>Kickoff<input name="time" type="time" required value="15:00"></label></div>
+      <div class="form-row"><label>Date<input name="date" type="date" required></label><label><span id="fixture-time-label">Kickoff</span><input name="time" type="time" required value="15:00"></label></div>
       <label>Venue<input name="venue" placeholder="e.g. Emirates Stadium"></label>
       <button class="button button-solid submit" value="default">Add fixture</button>
     </form>
@@ -98,6 +98,6 @@
     </form>
   </dialog>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="app.js?v=20260915-mlb-series-1"></script>
+  <script src="app.js?v=20260922-nba-1"></script>
 </body>
 </html>

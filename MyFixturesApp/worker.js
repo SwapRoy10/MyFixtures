@@ -47,6 +47,126 @@ function mlbLogoUrl(abbreviation) {
   return `https://a.espncdn.com/i/teamlogos/mlb/500/${abbreviation.toLowerCase()}.png`;
 }
 
+function nbaEspnCode(abbreviation) {
+  const code = String(abbreviation || '').toUpperCase();
+  return ({ GSW: 'GS', NYK: 'NY', NOP: 'NO', SAS: 'SA', UTA: 'UTAH', WAS: 'WSH' }[code] || code).toLowerCase();
+}
+
+// Teams and Games are the only BALLDONTLIE endpoints used for NBA (both free).
+async function getNbaPages(endpoint, query, env) {
+  if (!env.BALLDONTLIE_API_KEY) throw Object.assign(new Error('BALLDONTLIE_API_KEY is required for NBA schedules.'), { status: 503 });
+  const rows = [];
+  const cursors = new Set();
+  query.set('per_page', '100');
+  while (true) {
+    const result = await fetchProviderJson(`https://api.balldontlie.io/v1/${endpoint}?${query}`, { Authorization: env.BALLDONTLIE_API_KEY }, endpoint === 'teams' ? providerRosterCacheTtl : providerScheduleCacheTtl);
+    if (!result.ok) {
+      const message = result.status === 429 ? 'NBA schedule provider is busy. Please try again in a minute.'
+        : result.status === 401 || result.status === 403 ? 'NBA access denied. Check the BALLDONTLIE API key.'
+          : 'NBA schedule provider is temporarily unavailable. Please try again later.';
+      throw Object.assign(new Error(message), { status: result.status >= 400 ? result.status : 502 });
+    }
+    if (!Array.isArray(result.payload.data)) throw new Error('Invalid NBA schedule response.');
+    rows.push(...result.payload.data);
+    const cursor = result.payload.meta?.next_cursor;
+    if (cursor == null) return rows;
+    if (cursors.has(String(cursor))) throw new Error('Invalid NBA pagination response.');
+    cursors.add(String(cursor));
+    query.set('cursor', String(cursor));
+  }
+}
+
+async function searchNbaTeams(url, env) {
+  try {
+    const teams = await getNbaPages('teams', new URLSearchParams(), env);
+    const search = (url.searchParams.get('search') || '').trim().toLowerCase();
+    const matches = teams.filter(team => ['East', 'West'].includes(team.conference) && team.division)
+      .filter(team => `${team.full_name} ${team.name} ${team.city} ${team.abbreviation}`.toLowerCase().includes(search))
+      .map(team => ({ id: team.id, sport: 'nba', name: team.full_name, abbreviation: team.abbreviation,
+        crest: `https://a.espncdn.com/i/teamlogos/nba/500/${nbaEspnCode(team.abbreviation)}.png`, conference: team.conference, division: team.division }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return new Response(JSON.stringify(matches), { headers: jsonHeaders });
+  } catch (error) {
+    return errorResponse(error.message, error.status || 502);
+  }
+}
+
+function normalizeNbaGame(game, teamId, phase) {
+  const home = Number(game.home_team?.id) === teamId;
+  if (!home && Number(game.visitor_team?.id) !== teamId) return null;
+  const opponent = home ? game.visitor_team : game.home_team;
+  const status = String(game.status_state || game.status || 'unknown').toLowerCase();
+  if (['canceled', 'cancelled', 'abandoned'].includes(status)) return null;
+  const scheduledDate = game.date?.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(scheduledDate || '') || !Number.isFinite(Date.parse(scheduledDate))) return null;
+  const hasTime = typeof game.datetime === 'string' && /T\d{2}:\d{2}/.test(game.datetime) && Number.isFinite(Date.parse(game.datetime));
+  const timeTbd = !hasTime || game.postponed === true || ['postponed', 'suspended', 'unknown'].includes(status) || /\btbd\b|\btba\b/i.test(game.status || '');
+  const seasonType = phase === 'preseason' ? phase : game.season_type || (game.postseason ? 'playoffs' : game.ist_stage ? 'ist' : 'regular');
+  const competition = seasonType === 'preseason' ? 'NBA Preseason' : seasonType === 'playin' ? 'NBA Play-In'
+    : seasonType === 'playoffs' ? 'NBA Playoffs' : game.ist_stage ? `NBA Cup - ${game.ist_stage}` : seasonType === 'ist' ? 'NBA Cup' : 'NBA Regular Season';
+  return { id: `nba-${game.id}`, sport: 'nba', utcDate: hasTime ? game.datetime : `${scheduledDate}T12:00:00Z`, scheduledDate, timeTbd,
+    opponent: opponent?.full_name || 'Opponent TBC', opponentAbbreviation: opponent?.abbreviation || '',
+    venue: typeof game.venue === 'string' ? game.venue : '', competition, seasonType,
+    postseason: Boolean(game.postseason || ['playin', 'playoffs'].includes(seasonType)), home, status, provider: 'balldontlie' };
+}
+
+async function enrichNbaVenues(fixtures, abbreviation, season) {
+  // NBA's free game schema has no arena. Match ESPN events by opponent, site,
+  // and Eastern calendar date, never by array position or a team's home arena.
+  const code = nbaEspnCode(abbreviation);
+  if (!/^[a-z]{2,4}$/.test(code)) return fixtures;
+  const easternDate = timestamp => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date(timestamp));
+  const schedules = await Promise.all([1, 2, 3].map(async seasonType => {
+    try {
+      const result = await fetchProviderJson(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/${code}/schedule?season=${season + 1}&seasontype=${seasonType}`, { Accept: 'application/json' }, providerScheduleCacheTtl);
+      return result.ok && Array.isArray(result.payload.events) ? result.payload.events : [];
+    } catch { return []; }
+  }));
+  const events = schedules.flat();
+  return fixtures.map(fixture => {
+    const event = events.find(event => {
+      if (!Number.isFinite(Date.parse(event.date))) return false;
+      const competitors = event.competitions?.[0]?.competitors || [];
+      const selected = competitors.find(entry => nbaEspnCode(entry.team?.abbreviation) === code);
+      const opponent = competitors.find(entry => entry !== selected);
+      return selected && (selected.homeAway === 'home') === fixture.home
+        && nbaEspnCode(opponent?.team?.abbreviation) === nbaEspnCode(fixture.opponentAbbreviation)
+        && easternDate(event.date) === fixture.scheduledDate;
+    });
+    const venue = event?.competitions?.[0]?.venue?.fullName;
+    return venue ? { ...fixture, venue, venueProvider: 'espn' } : fixture;
+  });
+}
+
+async function getNbaFixtures(url, env) {
+  const teamId = Number(url.searchParams.get('team'));
+  if (!Number.isSafeInteger(teamId) || teamId <= 0) return errorResponse('A valid BALLDONTLIE NBA team id is required.', 400);
+  const now = new Date();
+  const defaultSeason = now.getUTCFullYear() - (now.getUTCMonth() < 6 ? 1 : 0);
+  const dateFrom = url.searchParams.get('dateFrom') || `${defaultSeason}-07-01`;
+  const dateTo = url.searchParams.get('dateTo') || `${defaultSeason + 1}-06-30`;
+  const validDate = value => /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
+  const season = Number(dateFrom.slice(0, 4)) - (dateFrom.slice(5, 7) < '07' ? 1 : 0);
+  if (!validDate(dateFrom) || !validDate(dateTo) || dateFrom > dateTo || dateTo > `${season + 1}-06-30`) {
+    return errorResponse('Provide a valid NBA date range within one July-to-June season.', 400);
+  }
+  try {
+    const query = { 'team_ids[]': String(teamId), 'seasons[]': String(season), start_date: dateFrom, end_date: dateTo };
+    // Omitting season_type includes regular season, Cup, Play-In and playoffs;
+    // preseason must be requested separately. Complete both before responding.
+    const games = await getNbaPages('games', new URLSearchParams(query), env);
+    const preseason = await getNbaPages('games', new URLSearchParams({ ...query, season_type: 'preseason' }), env);
+    const normalized = [...games.map(game => normalizeNbaGame(game, teamId)), ...preseason.map(game => normalizeNbaGame(game, teamId, 'preseason'))]
+      .filter(fixture => fixture && fixture.scheduledDate >= dateFrom && fixture.scheduledDate <= dateTo);
+    const unique = [...new Map(normalized.map(fixture => [fixture.id, fixture])).values()];
+    const selectedTeam = [...games, ...preseason].flatMap(game => [game.home_team, game.visitor_team]).find(team => Number(team?.id) === teamId);
+    const fixtures = (await enrichNbaVenues(unique, selectedTeam?.abbreviation, season)).sort((a, b) => a.utcDate.localeCompare(b.utcDate));
+    return new Response(JSON.stringify({ fixtures, results: fixtures.length, provider: 'balldontlie', venueProvider: fixtures.some(fixture => fixture.venueProvider) ? 'espn' : null, season }), { headers: jsonHeaders });
+  } catch (error) {
+    return errorResponse(error.message, error.status || 502);
+  }
+}
+
 async function fetchProviderJson(providerUrl, headers, ttlSeconds) {
   const cache = caches.default;
   const cacheKey = new Request(providerUrl);
@@ -658,6 +778,10 @@ export default {
     }
 
     const sport = url.searchParams.get('sport') || 'soccer';
+    if (sport === 'nba') {
+      return withApiCache(request, url.pathname === '/api/teams' ? teamSearchCacheTtl : fixtureCacheTtl,
+        () => url.pathname === '/api/teams' ? searchNbaTeams(url, env) : getNbaFixtures(url, env));
+    }
     if (sport === 'f1') {
       if (url.pathname === '/api/teams') return new Response(JSON.stringify([]), { headers: jsonHeaders });
       return withApiCache(request, fixtureCacheTtl, () => getF1Fixtures(url, env));
