@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "test": "node --test",
+    "audit:nba": "node scripts/audit-nba.mjs",
     "deploy": "wrangler deploy",
     "preview": "wrangler dev"
   },

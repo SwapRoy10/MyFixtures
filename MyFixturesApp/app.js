@@ -22,7 +22,7 @@ const fixtures = [
   { date: '2027-05-15', time: '15:00', opponent: 'TBC', venue: 'TBC', competition: 'Premier League', home: false },
   { date: '2027-05-30', time: '16:00', opponent: 'TBC', venue: 'TBC', competition: 'Season final', home: true }
 ];
-const appRelease = '20260922-nba-1';
+const appRelease = '20260922-nba-2';
 const fallbackFixtures = [...fixtures];
 const f1Selection = { id: 'f1', sport: 'f1', name: 'Formula 1', abbreviation: 'F1', crest: 'https://city-png.b-cdn.net/thumbnail/thumbnail_public/uploads/preview/hd-f1-the-official-formula-1-transparent-png-701751712229525ajvwddtfme.png?v=2025092211' };
 const nflSelection = { id: 18, sport: 'nfl', name: 'Philadelphia Eagles', abbreviation: 'PHI', crest: 'https://a.espncdn.com/i/teamlogos/nfl/500/phi.png' };
@@ -312,12 +312,14 @@ async function addFixturesToGoogleCalendar(selectedFixtures, button, successLabe
   button.disabled = true;
   button.innerHTML = '<span>…</span> Connecting to Google';
   try {
-    const token = await getGoogleAccessToken();
     const orderedFixtures = calendarReadyFixtures(selectedFixtures).sort((first, second) => fixtureSortTime(first) - fixtureSortTime(second));
     if (!orderedFixtures.length) throw new Error('No remaining fixtures have confirmed kickoff times.');
-    for (let index = 0; index < orderedFixtures.length; index += 1) {
+    // Capture the selected team and timezone before sign-in or a sport switch.
+    const events = orderedFixtures.map(googleCalendarEvent);
+    const token = await getGoogleAccessToken();
+    for (let index = 0; index < events.length; index += 1) {
       button.innerHTML = `<span>…</span> Adding ${index + 1} of ${orderedFixtures.length}`;
-      const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(googleCalendarEvent(orderedFixtures[index])) });
+      const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(events[index]) });
       if (!response.ok) throw new Error(`Google Calendar rejected fixture ${index + 1}`);
     }
     button.innerHTML = `<span>✓</span> ${successLabel}`;
@@ -367,6 +369,8 @@ async function selectTeam(team) {
   const clubs = readSavedClubs().filter(saved => `${saved.sport || 'soccer'}:${saved.id}` !== `${normalizedTeam.sport}:${normalizedTeam.id}`);
   writeSavedClubs([normalizedTeam, ...clubs].slice(0, 12));
   currentTeam = normalizedTeam;
+  fixtures.splice(0, fixtures.length);
+  render();
   localStorage.setItem('fixture-current-team', JSON.stringify(currentTeam));
   clubDialog.close();
   renderSavedClubs();

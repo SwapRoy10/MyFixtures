@@ -125,8 +125,9 @@ test('NBA UI renders individual games and exports all confirmed games across tim
   vm.runInContext('downloadCalendar(fixtures)', context);
   assert.equal((await downloaded.text()).match(/BEGIN:VEVENT/g).length, 80);
   assert.equal(vm.runInContext('fixtureDateKey(fixtures.at(-1))', context), '2099-10-22');
-  vm.runInContext('getGoogleAccessToken = async () => "fake-token";', context);
+  vm.runInContext('getGoogleAccessToken = async () => { currentTeam = { name: "Other Team" }; selectedTimeZone = "America/Los_Angeles"; return "fake-token"; };', context);
   await vm.runInContext('addAllToGoogleCalendar()', context);
   assert.equal(posted.length, 80);
   assert.ok(posted.every(event => event.summary.includes('Philadelphia 76ers')));
+  assert.ok(posted.every(event => event.start.timeZone === 'America/New_York'));
 });
