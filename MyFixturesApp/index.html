@@ -36,7 +36,19 @@
     .fixture-past { opacity: .48; filter: grayscale(1); }
     .fixture-past .opponent, .fixture-past .fixture-meta b { color: var(--muted); }
     .fixture-add-disabled, .fixture-add-disabled:hover { background: var(--line); color: var(--muted); cursor: not-allowed; transform: none; }
-    @media (max-width: 700px) { .club-switcher { min-width: 0; } .brand-group { gap: 10px; } .sport-select { min-width: 74px; padding-left: 10px; } }
+    @media (max-width: 700px) {
+      .club-switcher { min-width: 0; }
+      .brand-group { gap: 10px; }
+      .sport-select { min-width: 74px; padding-left: 10px; }
+      .topbar { height: auto; min-height: 82px; flex-wrap: wrap; gap: 16px; padding: 18px 0; }
+      .topbar-meta { flex-wrap: wrap; gap: 8px; }
+      .topbar-meta .live-dot { margin-right: 0; }
+      .fixture, .fixture.series-game { grid-template-columns: 63px minmax(0, 1fr); padding: 16px 0; }
+      .fixture > * { min-width: 0; overflow-wrap: anywhere; }
+      .fixture-date { align-self: start; grid-row: 1 / span 2; }
+      .fixture-add { grid-column: 2; grid-row: auto; justify-self: start; }
+      .series-heading { flex-wrap: wrap; gap: 12px; }
+    }
   </style>
 </head>
 <body>
