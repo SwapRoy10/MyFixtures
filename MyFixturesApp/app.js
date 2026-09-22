@@ -22,14 +22,15 @@ const fixtures = [
   { date: '2027-05-15', time: '15:00', opponent: 'TBC', venue: 'TBC', competition: 'Premier League', home: false },
   { date: '2027-05-30', time: '16:00', opponent: 'TBC', venue: 'TBC', competition: 'Season final', home: true }
 ];
-const appRelease = '20260922-nba-2';
+const appRelease = '20260922-nhl-1';
 const fallbackFixtures = [...fixtures];
 const f1Selection = { id: 'f1', sport: 'f1', name: 'Formula 1', abbreviation: 'F1', crest: 'https://city-png.b-cdn.net/thumbnail/thumbnail_public/uploads/preview/hd-f1-the-official-formula-1-transparent-png-701751712229525ajvwddtfme.png?v=2025092211' };
 const nflSelection = { id: 18, sport: 'nfl', name: 'Philadelphia Eagles', abbreviation: 'PHI', crest: 'https://a.espncdn.com/i/teamlogos/nfl/500/phi.png' };
 const mlbSelection = { id: 19, sport: 'mlb', name: 'New York Yankees', abbreviation: 'NYY', crest: 'https://a.espncdn.com/i/teamlogos/mlb/500/nyy.png' };
 const nbaSelection = { id: 23, sport: 'nba', name: 'Philadelphia 76ers', abbreviation: 'PHI', crest: 'https://a.espncdn.com/i/teamlogos/nba/500/phi.png' };
+const nhlSelection = { id: 4, sport: 'nhl', name: 'Philadelphia Flyers', abbreviation: 'PHI', crest: 'https://assets.nhle.com/logos/nhl/svg/PHI_light.svg' };
 const soccerSelection = { id: 57, sport: 'soccer', name: 'Arsenal', crest: 'https://crests.football-data.org/57.png' };
-function defaultTeamForSport(sport) { return sport === 'f1' ? f1Selection : sport === 'nfl' ? nflSelection : sport === 'mlb' ? mlbSelection : sport === 'nba' ? nbaSelection : soccerSelection; }
+function defaultTeamForSport(sport) { return sport === 'f1' ? f1Selection : sport === 'nfl' ? nflSelection : sport === 'mlb' ? mlbSelection : sport === 'nba' ? nbaSelection : sport === 'nhl' ? nhlSelection : soccerSelection; }
 let fixtureLoadId = 0;
 let currentSport = localStorage.getItem('fixture-sport') || 'soccer';
 let currentTeam = JSON.parse(localStorage.getItem('fixture-current-team') || 'null') || defaultTeamForSport(currentSport);
@@ -54,7 +55,7 @@ const timezoneSelect = document.querySelector('#timezone-select');
 timezoneSelect.value = selectedTimeZone;
 sportSelect.value = currentSport;
 function timezoneLabel() { return timezoneSelect.options[timezoneSelect.selectedIndex].text; }
-function sportLabel() { return currentSport === 'f1' ? 'Formula 1' : currentSport === 'nfl' ? 'NFL' : currentSport === 'mlb' ? 'MLB' : currentSport === 'nba' ? 'NBA' : 'Soccer'; }
+function sportLabel() { return currentSport === 'f1' ? 'Formula 1' : currentSport === 'nfl' ? 'NFL' : currentSport === 'mlb' ? 'MLB' : currentSport === 'nba' ? 'NBA' : currentSport === 'nhl' ? 'NHL' : 'Soccer'; }
 function currentSeason() {
   const now = new Date();
   const startYear = now.getUTCMonth() >= 6 ? now.getUTCFullYear() : now.getUTCFullYear() - 1;
@@ -80,22 +81,23 @@ function teamMark(team, mini = false) {
 }
 function escapeHtml(value) { return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char])); }
 function fixtureTitle(fixture) { return fixture.title || (currentSport === 'f1' ? fixture.opponent : currentTeam.name + ' v ' + fixture.opponent + ' - ' + fixture.competition); }
-function fixtureDescription(fixture) { return currentSport === 'f1' ? 'Formula 1 race. Calendar duration is estimated at two hours.' : fixture.competition + ' - ' + currentTeam.name + ' ' + (fixture.home ? 'home' : 'away') + (['mlb', 'nba'].includes(currentSport) ? ' game' : ' fixture') + (currentSport === 'nba' ? '. Calendar duration is estimated at two and a half hours.' : ''); }
+function fixtureDescription(fixture) { return currentSport === 'f1' ? 'Formula 1 race. Calendar duration is estimated at two hours.' : fixture.competition + ' - ' + currentTeam.name + ' ' + (fixture.home ? 'home' : 'away') + (['mlb', 'nba', 'nhl'].includes(currentSport) ? ' game' : ' fixture') + (['nba', 'nhl'].includes(currentSport) ? '. Calendar duration is estimated at two and a half hours.' : ''); }
 function setTeamHeader() {
   const isF1 = currentSport === 'f1';
   const isMlb = currentSport === 'mlb';
   const isNba = currentSport === 'nba';
+  const isNhl = currentSport === 'nhl';
   const season = currentSeason();
-  document.querySelector('.hero-copy .eyebrow').textContent = isF1 ? 'YOUR RACEDAY, ORGANIZED' : isMlb ? 'YOUR BALLPARK, ORGANIZED' : isNba ? 'YOUR GAMEDAY, ORGANIZED' : 'Your matchday, organised';
-  document.querySelector('.hero-copy h1').innerHTML = isF1 ? 'Never miss<br><em>lights out.</em>' : isMlb ? 'Never miss<br><em>first pitch.</em>' : isNba ? 'Never miss<br><em>the tipoff.</em>' : 'Never miss<br><em>the kickoff.</em>';
-  document.querySelector('.hero-copy .lede').textContent = isF1 ? 'A focused calendar for every Grand Prix. Add one race or the whole season in seconds.' : isMlb ? 'Upcoming games grouped into series. Add one game, a full series, or the rest of the season.' : isNba ? 'Your team, all season long. Add one game or every upcoming tipoff to your calendar.' : 'A focused calendar for the fixtures of all your favorite teams. Add one match or the whole season in seconds.';
+  document.querySelector('.hero-copy .eyebrow').textContent = isF1 ? 'YOUR RACEDAY, ORGANIZED' : isMlb ? 'YOUR BALLPARK, ORGANIZED' : isNba || isNhl ? 'YOUR GAMEDAY, ORGANIZED' : 'Your matchday, organised';
+  document.querySelector('.hero-copy h1').innerHTML = isF1 ? 'Never miss<br><em>lights out.</em>' : isMlb ? 'Never miss<br><em>first pitch.</em>' : isNhl ? 'Never miss<br><em>the puck drop.</em>' : isNba ? 'Never miss<br><em>the tipoff.</em>' : 'Never miss<br><em>the kickoff.</em>';
+  document.querySelector('.hero-copy .lede').textContent = isF1 ? 'A focused calendar for every Grand Prix. Add one race or the whole season in seconds.' : isMlb ? 'Upcoming games grouped into series. Add one game, a full series, or the rest of the season.' : isNhl ? 'Your team, all season long. Add one game or every upcoming puck drop to your calendar.' : isNba ? 'Your team, all season long. Add one game or every upcoming tipoff to your calendar.' : 'A focused calendar for the fixtures of all your favorite teams. Add one match or the whole season in seconds.';
   document.querySelector('#club-select').disabled = isF1;
   document.querySelector('#add-fixture').hidden = isF1;
   document.querySelector('.section-label').textContent = isF1 ? 'Selected championship' : 'Selected team';
   document.querySelector('.topbar-meta > span:nth-child(2)').textContent = isF1 || isMlb ? 'Season ' + new Date().getUTCFullYear() : `Season ${season.label}`;
-  document.querySelector('.section-heading .eyebrow').textContent = isF1 ? new Date().getUTCFullYear() + ' Formula 1 season' : isMlb ? `${new Date().getUTCFullYear()} MLB season - today forward` : isNba ? `${season.startYear}-${String(season.endYear).slice(-2)} NBA season` : `${season.label} season - July through June`;
-  document.querySelector('.section-heading h2').textContent = isF1 ? 'Every Grand Prix.' : isMlb ? 'Every series. Every game.' : isNba ? 'Every team. Every game.' : 'Every team. Every match.';
-  document.querySelector('#fixture-time-label').textContent = isNba ? 'Tipoff' : 'Kickoff';
+  document.querySelector('.section-heading .eyebrow').textContent = isF1 ? new Date().getUTCFullYear() + ' Formula 1 season' : isMlb ? `${new Date().getUTCFullYear()} MLB season - today forward` : isNba || isNhl ? `${season.startYear}-${String(season.endYear).slice(-2)} ${sportLabel()} season` : `${season.label} season - July through June`;
+  document.querySelector('.section-heading h2').textContent = isF1 ? 'Every Grand Prix.' : isMlb ? 'Every series. Every game.' : isNba || isNhl ? 'Every team. Every game.' : 'Every team. Every match.';
+  document.querySelector('#fixture-time-label').textContent = isNhl ? 'Puck drop' : isNba ? 'Tipoff' : 'Kickoff';
   document.title = 'MyFixtures | ' + currentTeam.name + ' calendar';
   document.querySelector('#club-name').textContent = currentTeam.name;
   teamMarkWrapper.innerHTML = teamMark(currentTeam);
@@ -216,7 +218,7 @@ function render() {
     const dayFormat = new Intl.DateTimeFormat('en-GB', { timeZone: selectedTimeZone, weekday: 'short' });
     const past = isPastFixture(fixture);
     const kickoff = fixture.timeTbd ? 'TBD' : display.time;
-    return `<article class="fixture${past ? ' fixture-past' : ''}"><div class="fixture-date"><strong>${dateFormat.format(display.date)}</strong><small>${dayFormat.format(display.date)}</small></div><div><div class="opponent">${escapeHtml(currentSport === 'f1' ? fixtureTitle(fixture) : currentTeam.name + ' v ' + fixture.opponent)}</div><div class="home-away">${currentSport === 'f1' ? 'Race' : fixture.home ? 'Home' : 'Away'} &middot; ${escapeHtml(fixture.competition)}</div></div><div class="fixture-meta"><b>${kickoff}</b>${fixture.venue && fixture.venue !== 'TBC' ? `<br>${escapeHtml(fixture.venue)}` : ''}</div>${fixtureActionButton(fixture, index)}</article>`;
+    return `<article class="fixture${past ? ' fixture-past' : ''}"><div class="fixture-date"><strong>${dateFormat.format(display.date)}</strong><small>${dayFormat.format(display.date)}</small></div><div><div class="opponent">${escapeHtml(currentSport === 'f1' ? fixtureTitle(fixture) : currentTeam.name + ' v ' + fixture.opponent)}</div><div class="home-away">${currentSport === 'f1' ? 'Race' : fixture.neutralSite ? 'Neutral site' : fixture.home ? 'Home' : 'Away'} &middot; ${escapeHtml(fixture.competition)}</div></div><div class="fixture-meta"><b>${kickoff}</b>${fixture.venue && fixture.venue !== 'TBC' ? `<br>${escapeHtml(fixture.venue)}` : ''}</div>${fixtureActionButton(fixture, index)}</article>`;
     }).join('');
   }
   document.querySelectorAll('.fixture-add[data-index]').forEach(button => button.addEventListener('click', () => openGoogleCalendar(orderedFixtures[button.dataset.index])));
@@ -238,7 +240,7 @@ async function loadLiveFixtures() {
     if (loadId !== fixtureLoadId) return;
     if (!response.ok) throw new Error(payload.error || `Fixture API returned ${response.status}`);
     const liveFixtures = payload.fixtures;
-    if (!Array.isArray(liveFixtures) || (liveFixtures.length === 0 && !['f1', 'mlb', 'nba'].includes(currentSport))) throw new Error(`No live fixtures returned (${JSON.stringify(payload.errors || {})})`);
+    if (!Array.isArray(liveFixtures) || (liveFixtures.length === 0 && !['f1', 'mlb', 'nba', 'nhl'].includes(currentSport))) throw new Error(`No live fixtures returned (${JSON.stringify(payload.errors || {})})`);
     fixtures.splice(0, fixtures.length, ...liveFixtures.map(item => {
       if (item.utcDate && item.opponent) {
         const kickoff = formatFixtureForSelectedZone(item.utcDate);
@@ -248,10 +250,14 @@ async function loadLiveFixtures() {
       return { ...kickoff, utcDate: item.utcDate, opponent: item.homeTeam.id === currentTeam.id ? item.awayTeam.name : item.homeTeam.name, venue: item.venue || '', competition: item.competition.name, home: item.homeTeam.id === currentTeam.id };
     }));
     setTeamHeader();
-    const source = currentSport === 'soccer' && payload.source === 'football-data+espn' ? '<a href="https://www.football-data.org/" target="_blank" rel="noreferrer">football-data.org</a> and ESPN' : currentSport === 'soccer' && payload.source === 'espn' ? 'ESPN schedule data' : currentSport === 'nfl' && payload.provider === 'espn' ? 'ESPN schedule data' : currentSport === 'f1' && payload.provider === 'jolpica' ? '<a href="https://github.com/jolpica/jolpica-f1" target="_blank" rel="noreferrer">Jolpica F1</a>' : ['nfl', 'f1', 'mlb', 'nba'].includes(currentSport) ? '<a href="https://www.balldontlie.io/" target="_blank" rel="noreferrer">BALLDONTLIE</a>' : '<a href="https://www.football-data.org/" target="_blank" rel="noreferrer">football-data.org</a>';
+    const source = currentSport === 'nhl' ? '<a href="https://www.nhl.com/schedule" target="_blank" rel="noreferrer">NHL</a>' : currentSport === 'soccer' && payload.source === 'football-data+espn' ? '<a href="https://www.football-data.org/" target="_blank" rel="noreferrer">football-data.org</a> and ESPN' : currentSport === 'soccer' && payload.source === 'espn' ? 'ESPN schedule data' : currentSport === 'nfl' && payload.provider === 'espn' ? 'ESPN schedule data' : currentSport === 'f1' && payload.provider === 'jolpica' ? '<a href="https://github.com/jolpica/jolpica-f1" target="_blank" rel="noreferrer">Jolpica F1</a>' : ['nfl', 'f1', 'mlb', 'nba'].includes(currentSport) ? '<a href="https://www.balldontlie.io/" target="_blank" rel="noreferrer">BALLDONTLIE</a>' : '<a href="https://www.football-data.org/" target="_blank" rel="noreferrer">football-data.org</a>';
     sourceNote.innerHTML = `Live ${sportLabel()} schedule from ${source}. Times converted to ${timezoneLabel()}.${currentSport === 'mlb' ? ' Showing games from today forward, including determined postseason matchups.' : ''}`;
     if (currentSport === 'f1' && !liveFixtures.length) sourceNote.textContent = 'No upcoming Grand Prix races are available for this season.';
     if (currentSport === 'mlb' && !liveFixtures.length) sourceNote.textContent = 'No remaining MLB games are currently scheduled for this team.';
+    if (currentSport === 'nhl') {
+      sourceNote.innerHTML += ' Includes published preseason, regular-season and Stanley Cup playoff games. Playoff matchups appear when scheduled. Unconfirmed times are excluded from calendar exports.';
+      if (!liveFixtures.length) sourceNote.textContent = 'No NHL games have been published for this team and season yet. Please check back later.';
+    }
     if (currentSport === 'nba') {
       sourceNote.innerHTML += `${payload.venueProvider === 'espn' ? ' Venues from ESPN.' : ''} Includes announced preseason, regular-season, NBA Cup and postseason games. Additional Cup and playoff matchups appear when scheduled. Unconfirmed times are excluded from calendar exports.`;
       if (!liveFixtures.length) sourceNote.textContent = 'The NBA schedule for this team has not been published yet. Please check back later.';
@@ -262,13 +268,13 @@ async function loadLiveFixtures() {
     fixtures.splice(0, fixtures.length, ...(currentSport === 'soccer' && currentTeam.id === 57 ? fallbackFixtures : []));
     render();
     sourceNote.innerHTML = currentSport === 'soccer' && currentTeam.id === 57 ? 'Live football-data.org feed unavailable. Showing verified Arsenal entries. <a href="https://www.arsenal.com/fixtures/men/fixtures" target="_blank" rel="noreferrer">Check Arsenal.com</a>.' : `No fixtures available for ${currentTeam.name}. Try another team or check the ${sportLabel()} provider.`;
-    if (currentSport === 'f1' || currentSport === 'nba') sourceNote.textContent = error.message;
+    if (['f1', 'nba', 'nhl'].includes(currentSport)) sourceNote.textContent = error.message;
     console.info('Live fixtures unavailable; showing the local schedule.', error);
   }
 }
 function escapeICS(value) { return String(value).replace(/[\\;,]/g, match => `\\${match}`).replace(/\n/g, '\\n'); }
 function calendarEnd(fixture) {
-  const durationMinutes = currentSport === 'mlb' || currentSport === 'nfl' ? 180 : currentSport === 'nba' ? 150 : 120;
+  const durationMinutes = currentSport === 'mlb' || currentSport === 'nfl' ? 180 : ['nba', 'nhl'].includes(currentSport) ? 150 : 120;
   return formatFixtureForSelectedZone(fixtureSortTime(fixture) + durationMinutes * 60 * 1000);
 }
 function googleCalendarUrl(fixture) {
@@ -313,7 +319,7 @@ async function addFixturesToGoogleCalendar(selectedFixtures, button, successLabe
   button.innerHTML = '<span>…</span> Connecting to Google';
   try {
     const orderedFixtures = calendarReadyFixtures(selectedFixtures).sort((first, second) => fixtureSortTime(first) - fixtureSortTime(second));
-    if (!orderedFixtures.length) throw new Error('No remaining fixtures have confirmed kickoff times.');
+    if (!orderedFixtures.length) throw new Error('No remaining fixtures have confirmed start times.');
     // Capture the selected team and timezone before sign-in or a sport switch.
     const events = orderedFixtures.map(googleCalendarEvent);
     const token = await getGoogleAccessToken();
@@ -383,12 +389,12 @@ function calendarEvent(fixture) {
   const displayDate = display.date.toISOString().slice(0, 10).replaceAll('-', '');
   const start = `${displayDate}T${display.time.replace(':', '')}00`;
   const end = `${calendarEnd(fixture).date.replaceAll('-', '')}T${calendarEnd(fixture).time.replace(':', '')}00`;
-  return ['BEGIN:VEVENT', `UID:fixture-${fixture.date}-${fixture.opponent.replaceAll(' ', '-').toLowerCase()}@fixture`, `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}`, `DTSTART;TZID=${selectedTimeZone}:${start}`, `DTEND;TZID=${selectedTimeZone}:${end}`, `SUMMARY:${escapeICS(fixtureTitle(fixture))}`, fixture.venue ? `LOCATION:${escapeICS(fixture.venue)}` : null, `DESCRIPTION:${escapeICS(fixtureDescription(fixture))}`, 'END:VEVENT'].filter(Boolean).join('\r\n');
+  return ['BEGIN:VEVENT', `UID:fixture-${fixture.id || `${currentSport}-${currentTeam.id}-${fixture.date}-${fixture.time}-${fixture.opponent.replaceAll(' ', '-').toLowerCase()}`}@fixture`, `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}`, `DTSTART;TZID=${selectedTimeZone}:${start}`, `DTEND;TZID=${selectedTimeZone}:${end}`, `SUMMARY:${escapeICS(fixtureTitle(fixture))}`, fixture.venue ? `LOCATION:${escapeICS(fixture.venue)}` : null, `DESCRIPTION:${escapeICS(fixtureDescription(fixture))}`, 'END:VEVENT'].filter(Boolean).join('\r\n');
 }
 function downloadCalendar(selected) {
   const calendarReady = calendarReadyFixtures(selected);
   if (!calendarReady.length) {
-    sourceNote.textContent = 'No remaining fixtures have confirmed kickoff times.';
+    sourceNote.textContent = 'No remaining fixtures have confirmed start times.';
     return;
   }
   const content = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Fixture//MyFixtures//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', ...calendarReady.map(calendarEvent), 'END:VCALENDAR'].join('\r\n');

@@ -1,6 +1,6 @@
 # MyFixtures
 
-MyFixtures is a responsive sports schedule website for following soccer clubs, NFL, MLB and NBA teams, and the Formula 1 season. It shows fixtures in the viewer's selected time zone and can export individual events, full schedules, or confirmed upcoming fixtures to Google Calendar.
+MyFixtures is a responsive sports schedule website for following soccer clubs, NFL, MLB, NBA and NHL teams, and the Formula 1 season. It shows fixtures in the viewer's selected time zone and can export individual events, full schedules, or confirmed upcoming fixtures to Google Calendar.
 
 ## Live sites
 
@@ -9,7 +9,8 @@ MyFixtures is a responsive sports schedule website for following soccer clubs, N
 
 ## Features
 
-- Search and save soccer, NFL, MLB, and NBA teams.
+- Search and save soccer, NFL, MLB, NBA, and NHL teams.
+- Follow NHL preseason, regular-season and published Stanley Cup playoff games, with individual and full-season calendar actions.
 - Follow NBA preseason, regular-season, NBA Cup, Play-In and playoff games as matchups are published, with individual Google Calendar buttons and season-wide exports.
 - View full-season schedules, including completed events.
 - Browse remaining MLB games in series cards with Game 1, Game 2, and later-game tabs.
@@ -22,6 +23,7 @@ MyFixtures is a responsive sports schedule website for following soccer clubs, N
 
 ## Schedule data
 
+- NHL schedules come from the league's public, keyless API. The app automatically fetches each selected team's full July-to-June season, preserving exact published UTC times, venues and separate split-squad games. Unconfirmed times remain TBD and are not exported. Run `npm run audit:nhl` to check all 32 teams against the source.
 - Soccer league schedules come from [football-data.org](https://www.football-data.org/) and are cross-checked with ESPN for confirmed kickoff times.
 - ESPN supplements domestic cup, Europa League, and Conference League fixtures.
 - NFL schedules prefer ESPN and use [BALLDONTLIE](https://www.balldontlie.io/) as a fallback.

@@ -1,5 +1,20 @@
 # Live schedule API setup
 
+## NHL
+
+NHL uses the league's public Web API, with no API key or BALLDONTLIE subscription. Select NHL and search/save any active team; the default is the Philadelphia Flyers.
+
+- Active teams: `https://api-web.nhle.com/v1/schedule-calendar/now`
+- Full team season: `https://api-web.nhle.com/v1/club-schedule-season/PHI/20262027`
+
+The Worker resolves team IDs to NHL abbreviations automatically. Each season runs July through June, using an eight-digit identifier (`20262027`). The feed returns the complete season without pagination, including preseason, regular season and published Stanley Cup playoff games. Undetermined playoff matchups are not invented. Split-squad games remain separate using NHL game IDs.
+
+Dates and UTC start times come directly from NHL. Timezone conversion uses the date-specific daylight-saving offset. Date-only, unconfirmed and postponed games remain TBD and cannot be exported. Completed games remain visible; individual Google Calendar buttons, Add All and ICS downloads export confirmed upcoming games with an estimated 150-minute duration. Venue and neutral-site flags come from each game, not a team's default arena.
+
+Team data is cached for 12 hours and schedules for one hour. Provider requests have a 15-second timeout; provider errors are not cached as successful empty schedules. The API is a public NHL service, not a contracted developer service, so availability and schemas may change.
+
+Run `npm test` for regression and calendar tests. Run `npm run audit:nhl` to compare all 32 development-site schedules with NHL source game IDs, dates, timestamps, opponents and venues, check opposing-team consistency, measure cold/warm responses, and verify a completed Stanley Cup playoff season. Use `npm run audit:nhl -- --local` to audit the local Worker; `MYFIXTURES_URL` and `NHL_SEASON_YEAR` can override the target and season. These audits are read-only and do not write to Google Calendar.
+
 ## NBA
 
 Select NBA to search and save current NBA teams. The default team is the Philadelphia 76ers. Schedules span July 1 through June 30, using the starting year as BALLDONTLIE's season identifier (2026 for 2026-27).

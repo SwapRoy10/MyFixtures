@@ -47,6 +47,81 @@ function mlbLogoUrl(abbreviation) {
   return `https://a.espncdn.com/i/teamlogos/mlb/500/${abbreviation.toLowerCase()}.png`;
 }
 
+// NHL's public feed provides full team-season schedules without a key or pagination.
+async function getNhlData(path, field, ttl) {
+  const key = new Request(`https://api-web.nhle.com/v1/${path}`);
+  const cached = await caches.default.match(key);
+  if (cached) return cached.json();
+  const response = await fetch(key.url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(15000) });
+  if (!response.ok) throw Object.assign(new Error('NHL schedule provider is temporarily unavailable. Please try again later.'), { status: response.status === 429 ? 429 : 502 });
+  const data = await response.json();
+  if (!Array.isArray(data?.[field])) throw new Error('Invalid NHL schedule response. Please try again later.');
+  await caches.default.put(key, new Response(JSON.stringify(data), { headers: { 'content-type': 'application/json', 'cache-control': `public, max-age=${ttl}` } }));
+  return data;
+}
+
+async function getNhlTeams() {
+  const data = await getNhlData('schedule-calendar/now', 'teams', providerRosterCacheTtl);
+  return data.teams.filter(team => Number.isSafeInteger(team.id) && /^[A-Z]{3}$/.test(team.abbrev) && team.name?.default)
+    .map(team => ({ id: team.id, sport: 'nhl', name: team.name.default, abbreviation: team.abbrev, crest: team.logo }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function searchNhlTeams(url) {
+  try {
+    const search = normalizedIdentity(url.searchParams.get('search'));
+    const teams = (await getNhlTeams()).filter(team => normalizedIdentity(`${team.name} ${team.abbreviation}`).includes(search));
+    return Response.json(teams, { headers: jsonHeaders });
+  } catch (error) {
+    return errorResponse(error.name === 'TimeoutError' ? 'NHL provider timed out. Please try again.' : error.message, error.status || 502);
+  }
+}
+
+function validNhlDate(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value || '') && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
+}
+
+function normalizeNhlGame(game, teamId) {
+  const home = game.homeTeam?.id === teamId;
+  if (!home && game.awayTeam?.id !== teamId) return null;
+  if (![1, 2, 3].includes(game.gameType) || ['CNCL', 'CANCELLED', 'CANCELED'].includes(game.gameScheduleState) || game.gameState === 'CNCL') return null;
+  if (!game.id || !validNhlDate(game.gameDate)) throw new Error('Invalid NHL game date. Please try again later.');
+  const opponent = home ? game.awayTeam : game.homeTeam;
+  const hasTime = typeof game.startTimeUTC === 'string' && /T\d{2}:\d{2}.*Z$/.test(game.startTimeUTC) && Number.isFinite(Date.parse(game.startTimeUTC));
+  const timeTbd = !hasTime || game.gameScheduleState !== 'OK' || ['PPD', 'SUSP'].includes(game.gameState);
+  const postseason = game.gameType === 3;
+  const seasonType = game.gameType === 1 ? 'preseason' : postseason ? 'playoffs' : 'regular';
+  return { id: `nhl-${game.id}`, sport: 'nhl', utcDate: hasTime ? game.startTimeUTC : `${game.gameDate}T12:00:00Z`,
+    scheduledDate: game.gameDate, timeTbd, opponent: [opponent?.placeName?.default, opponent?.commonName?.default].filter(Boolean).join(' ') || 'Opponent TBC',
+    opponentAbbreviation: opponent?.abbrev || '', venue: game.venue?.default || '', home, neutralSite: Boolean(game.neutralSite),
+    competition: postseason ? 'NHL Stanley Cup Playoffs' : game.gameType === 1 ? 'NHL Preseason' : 'NHL Regular Season',
+    seasonType, postseason, status: String(game.gameState || 'FUT').toLowerCase(), provider: 'nhl' };
+}
+
+async function getNhlFixtures(url) {
+  const teamId = Number(url.searchParams.get('team'));
+  if (!Number.isSafeInteger(teamId) || teamId <= 0) return errorResponse('A valid NHL team id is required.', 400);
+  const now = new Date();
+  const defaultSeason = now.getUTCFullYear() - (now.getUTCMonth() < 6 ? 1 : 0);
+  const dateFrom = url.searchParams.get('dateFrom') || `${defaultSeason}-07-01`;
+  const dateTo = url.searchParams.get('dateTo') || `${defaultSeason + 1}-06-30`;
+  const year = Number(dateFrom.slice(0, 4)) - (dateFrom.slice(5, 7) < '07' ? 1 : 0);
+  if (!validNhlDate(dateFrom) || !validNhlDate(dateTo) || dateFrom > dateTo || dateTo > `${year + 1}-06-30`) return errorResponse('Provide a valid NHL date range within one July-to-June season.', 400);
+  try {
+    const team = (await getNhlTeams()).find(entry => entry.id === teamId);
+    if (!team) return errorResponse('NHL team not found.', 404);
+    const season = `${year}${year + 1}`;
+    const data = await getNhlData(`club-schedule-season/${team.abbreviation}/${season}`, 'games', providerScheduleCacheTtl);
+    const games = data.games.filter(game => String(game.season) === season).map(game => normalizeNhlGame(game, teamId))
+      .filter(game => game && game.scheduledDate >= dateFrom && game.scheduledDate <= dateTo);
+    // Split-squad preseason games can share opponents and dates: only dedupe by ID.
+    const fixtures = [...new Map(games.map(game => [game.id, game])).values()].sort((a, b) => a.utcDate.localeCompare(b.utcDate));
+    return Response.json({ fixtures, results: fixtures.length, provider: 'nhl', season }, { headers: jsonHeaders });
+  } catch (error) {
+    return errorResponse(error.name === 'TimeoutError' ? 'NHL provider timed out. Please try again.' : error.message, error.status || 502);
+  }
+}
+
 function nbaEspnCode(abbreviation) {
   const code = String(abbreviation || '').toUpperCase();
   return ({ GSW: 'GS', NYK: 'NY', NOP: 'NO', SAS: 'SA', UTA: 'UTAH', WAS: 'WSH' }[code] || code).toLowerCase();
@@ -783,6 +858,10 @@ export default {
     }
 
     const sport = url.searchParams.get('sport') || 'soccer';
+    if (sport === 'nhl') {
+      return withApiCache(request, url.pathname === '/api/teams' ? teamSearchCacheTtl : fixtureCacheTtl,
+        () => url.pathname === '/api/teams' ? searchNhlTeams(url) : getNhlFixtures(url));
+    }
     if (sport === 'nba') {
       return withApiCache(request, url.pathname === '/api/teams' ? teamSearchCacheTtl : fixtureCacheTtl,
         () => url.pathname === '/api/teams' ? searchNbaTeams(url, env) : getNbaFixtures(url, env));
