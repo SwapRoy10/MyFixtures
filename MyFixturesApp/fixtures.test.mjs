@@ -174,3 +174,68 @@ test('F1 fallback keeps completed races while excluding canceled races', async (
   assert.equal(body.results, 1);
   assert.equal(body.fixtures[0].status, 'completed');
 });
+
+test('MLB team search returns matching clubs with baseball logos', async () => {
+  globalThis.fetch = async (input, options) => {
+    const url = new URL(input);
+    assert.equal(url.pathname, '/mlb/v1/teams');
+    assert.equal(options.headers.Authorization, 'test-key');
+    return Response.json({ data: [
+      { id: 19, display_name: 'New York Yankees', short_display_name: 'Yankees', name: 'Yankees', location: 'New York', abbreviation: 'NYY', league: 'American', division: 'East' },
+      { id: 20, display_name: 'New York Mets', short_display_name: 'Mets', name: 'Mets', location: 'New York', abbreviation: 'NYM', league: 'National', division: 'East' }
+    ] });
+  };
+
+  const response = await worker.fetch(new Request('https://example.test/api/teams?sport=mlb&search=yankees'), { BALLDONTLIE_API_KEY: 'test-key' });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.length, 1);
+  assert.deepEqual(body[0], {
+    id: 19,
+    sport: 'mlb',
+    name: 'New York Yankees',
+    abbreviation: 'NYY',
+    crest: 'https://a.espncdn.com/i/teamlogos/mlb/500/nyy.png',
+    league: 'American',
+    division: 'East'
+  });
+});
+
+test('MLB schedule paginates and keeps only upcoming regular and postseason games', async () => {
+  const requests = [];
+  globalThis.fetch = async (input, options) => {
+    const url = new URL(input);
+    requests.push(url);
+    assert.equal(options.headers.Authorization, 'test-key');
+    assert.equal(url.searchParams.get('team_ids[]'), '19');
+    assert.equal(url.searchParams.get('seasons[]'), '2099');
+    assert.equal(url.searchParams.get('per_page'), '100');
+    const yankees = { id: 19, display_name: 'New York Yankees', abbreviation: 'NYY' };
+    const redSox = { id: 2, display_name: 'Boston Red Sox', abbreviation: 'BOS' };
+    if (!url.searchParams.has('cursor')) {
+      return Response.json({ data: [
+        { id: 1, date: '2099-09-14T23:05:00Z', season_type: 'regular', postseason: false, status_state: 'scheduled', venue: 'Yankee Stadium', home_team: yankees, away_team: redSox },
+        { id: 2, date: '2099-09-16T23:05:00Z', season_type: 'regular', postseason: false, status_state: 'scheduled', venue: 'Yankee Stadium', home_team: yankees, away_team: redSox },
+        { id: 3, date: '2099-09-17T23:05:00Z', season_type: 'regular', postseason: false, status: 'STATUS_FINAL', venue: 'Yankee Stadium', home_team: yankees, away_team: redSox }
+      ], meta: { next_cursor: 100 } });
+    }
+    assert.equal(url.searchParams.get('cursor'), '100');
+    return Response.json({ data: [
+      { id: 4, date: '2099-10-05T00:10:00Z', season_type: 'postseason', postseason: true, status_state: 'scheduled', venue: 'Fenway Park', home_team: redSox, away_team: yankees },
+      { id: 5, date: '2099-10-06T00:10:00Z', season_type: 'postseason', postseason: true, status_state: 'canceled', venue: 'Fenway Park', home_team: redSox, away_team: yankees }
+    ], meta: { next_cursor: null } });
+  };
+
+  const response = await worker.fetch(new Request('https://example.test/api/fixtures?sport=mlb&team=19&dateFrom=2099-09-15&dateTo=2099-12-31'), { BALLDONTLIE_API_KEY: 'test-key' });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(requests.length, 2);
+  assert.equal(body.provider, 'balldontlie');
+  assert.equal(body.results, 2);
+  assert.deepEqual(body.fixtures.map(fixture => fixture.id), ['mlb-2', 'mlb-4']);
+  assert.equal(body.fixtures[0].opponent, 'Boston Red Sox');
+  assert.equal(body.fixtures[0].home, true);
+  assert.equal(body.fixtures[1].competition, 'MLB Postseason');
+  assert.equal(body.fixtures[1].postseason, true);
+  assert.equal(body.fixtures[1].home, false);
+});

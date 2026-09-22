@@ -1,7 +1,9 @@
 const rosterCache = new Map();
 const nflTeamsCache = { created: 0, teams: [] };
+const mlbTeamsCache = { created: 0, teams: [] };
 const rosterCacheDuration = 30 * 60 * 1000;
 const nflTeamsCacheDuration = 12 * 60 * 60 * 1000;
+const mlbTeamsCacheDuration = 12 * 60 * 60 * 1000;
 const teamSearchCacheTtl = 12 * 60 * 60;
 const fixtureCacheTtl = 60 * 60;
 const providerRosterCacheTtl = 12 * 60 * 60;
@@ -39,6 +41,10 @@ const jsonHeaders = {
 
 function nflLogoUrl(abbreviation) {
   return `https://a.espncdn.com/i/teamlogos/nfl/500/${abbreviation.toLowerCase()}.png`;
+}
+
+function mlbLogoUrl(abbreviation) {
+  return `https://a.espncdn.com/i/teamlogos/mlb/500/${abbreviation.toLowerCase()}.png`;
 }
 
 async function fetchProviderJson(providerUrl, headers, ttlSeconds) {
@@ -350,6 +356,26 @@ async function getNflTeams(env) {
   return nflTeamsCache.teams;
 }
 
+async function getMlbTeams(env) {
+  if (mlbTeamsCache.teams.length && Date.now() - mlbTeamsCache.created < mlbTeamsCacheDuration) return mlbTeamsCache.teams;
+  if (!env.BALLDONTLIE_API_KEY) return null;
+  const { ok, payload } = await fetchProviderJson('https://api.balldontlie.io/mlb/v1/teams', { Authorization: env.BALLDONTLIE_API_KEY }, providerRosterCacheTtl);
+  if (!ok) return null;
+  mlbTeamsCache.created = Date.now();
+  mlbTeamsCache.teams = payload.data || [];
+  return mlbTeamsCache.teams;
+}
+
+async function searchMlbTeams(url, env) {
+  const teams = await getMlbTeams(env);
+  if (!teams) return errorResponse('BALLDONTLIE_API_KEY is missing or the MLB team feed is unavailable.');
+  const search = (url.searchParams.get('search') || '').toLowerCase();
+  const matches = teams
+    .filter(team => `${team.display_name || ''} ${team.short_display_name || ''} ${team.name || ''} ${team.location || ''} ${team.abbreviation || ''}`.toLowerCase().includes(search))
+    .map(team => ({ id: team.id, sport: 'mlb', name: team.display_name, abbreviation: team.abbreviation, crest: mlbLogoUrl(team.abbreviation), league: team.league, division: team.division }));
+  return new Response(JSON.stringify(matches), { status: 200, headers: jsonHeaders });
+}
+
 async function searchNflTeams(url, env) {
   const teams = await getNflTeams(env);
   if (!teams) return errorResponse('BALLDONTLIE_API_KEY is missing or the NFL team feed is unavailable.');
@@ -449,6 +475,79 @@ async function getNflFixtures(url, env) {
     return gameDate >= dateFrom && gameDate <= dateTo;
   });
   return new Response(JSON.stringify({ fixtures: games, results: games.length, provider: 'balldontlie' }), { status: 200, headers: jsonHeaders });
+}
+
+async function getMlbPages(query, env) {
+  const games = [];
+  const cursors = new Set();
+  query.set('per_page', '100');
+  while (true) {
+    const result = await fetchProviderJson(`https://api.balldontlie.io/mlb/v1/games?${query}`, { Authorization: env.BALLDONTLIE_API_KEY }, providerScheduleCacheTtl);
+    if (!result.ok) {
+      const providerMessage = result.payload?.message || result.payload?.error;
+      const error = new Error(result.status === 401 || result.status === 403
+        ? 'MLB access denied. Check BALLDONTLIE_API_KEY; the Teams and Games endpoints are available on the free MLB tier.'
+        : result.status === 429
+          ? 'BALLDONTLIE MLB rate limit reached. Please try again shortly.'
+          : `BALLDONTLIE MLB schedule request failed (${result.status})${providerMessage ? `: ${providerMessage}` : '.'}`);
+      error.status = result.status >= 400 && result.status <= 599 ? result.status : 502;
+      throw error;
+    }
+    if (!Array.isArray(result.payload.data)) throw new Error('Invalid MLB schedule response.');
+    games.push(...result.payload.data);
+    const cursor = result.payload.meta?.next_cursor;
+    if (cursor == null) return games;
+    if (cursors.has(String(cursor))) throw new Error('Invalid MLB pagination response.');
+    cursors.add(String(cursor));
+    query.set('cursor', String(cursor));
+  }
+}
+
+async function getMlbFixtures(url, env) {
+  const teamId = Number(url.searchParams.get('team'));
+  if (!teamId) return errorResponse('A BALLDONTLIE MLB team id is required.', 400);
+  if (!env.BALLDONTLIE_API_KEY) return errorResponse('BALLDONTLIE_API_KEY is required for MLB schedules.');
+
+  const today = new Date().toISOString().slice(0, 10);
+  const dateFrom = url.searchParams.get('dateFrom') || today;
+  const dateTo = url.searchParams.get('dateTo') || `${dateFrom.slice(0, 4)}-12-31`;
+  const validDate = value => /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
+  if (!validDate(dateFrom) || !validDate(dateTo) || dateFrom > dateTo || dateFrom.slice(0, 4) !== dateTo.slice(0, 4)) {
+    return errorResponse('Provide a valid MLB date range within one calendar year.', 400);
+  }
+
+  try {
+    const query = new URLSearchParams({ 'team_ids[]': String(teamId), 'seasons[]': dateFrom.slice(0, 4) });
+    const excluded = new Set(['final', 'completed', 'canceled', 'cancelled', 'abandoned']);
+    const games = await getMlbPages(query, env);
+    const fixtures = [...new Map(games.filter(game => {
+      const gameDate = game.date?.slice(0, 10);
+      const status = String(game.status_state || game.status || '').toLowerCase().replace(/^status_/, '');
+      return gameDate >= dateFrom && gameDate <= dateTo && !excluded.has(status);
+    }).map(game => {
+      const homeTeam = game.home_team || {};
+      const awayTeam = game.away_team || {};
+      const isHome = homeTeam.id === teamId;
+      const opponent = isHome ? awayTeam : homeTeam;
+      return [String(game.id), {
+        id: `mlb-${game.id}`,
+        sport: 'mlb',
+        utcDate: game.date,
+        timeTbd: false,
+        opponent: opponent.display_name || opponent.short_display_name || opponent.name || (isHome ? game.away_team_name : game.home_team_name) || 'Opponent TBC',
+        venue: game.venue || '',
+        competition: game.season_type === 'postseason' || game.postseason ? 'MLB Postseason' : 'MLB',
+        seasonType: game.season_type || (game.postseason ? 'postseason' : 'regular'),
+        postseason: Boolean(game.postseason || game.season_type === 'postseason'),
+        home: isHome,
+        status: game.status_state || game.status || 'scheduled',
+        provider: 'balldontlie'
+      }];
+    })).values()].sort((a, b) => a.utcDate.localeCompare(b.utcDate));
+    return new Response(JSON.stringify({ fixtures, results: fixtures.length, provider: 'balldontlie' }), { status: 200, headers: jsonHeaders });
+  } catch (error) {
+    return errorResponse(error.status ? error.message : 'BALLDONTLIE MLB schedule is temporarily unavailable. Please try again later.', error.status || 502);
+  }
 }
 
 async function getF1Pages(endpoint, query, env) {
@@ -564,8 +663,8 @@ export default {
       return withApiCache(request, fixtureCacheTtl, () => getF1Fixtures(url, env));
     }
     if (url.pathname === '/api/teams') {
-      return withApiCache(request, teamSearchCacheTtl, () => sport === 'nfl' ? searchNflTeams(url, env) : searchSoccerTeams(url, env));
+      return withApiCache(request, teamSearchCacheTtl, () => sport === 'nfl' ? searchNflTeams(url, env) : sport === 'mlb' ? searchMlbTeams(url, env) : searchSoccerTeams(url, env));
     }
-    return withApiCache(request, fixtureCacheTtl, () => sport === 'nfl' ? getNflFixtures(url, env) : getSoccerFixtures(url, env));
+    return withApiCache(request, fixtureCacheTtl, () => sport === 'nfl' ? getNflFixtures(url, env) : sport === 'mlb' ? getMlbFixtures(url, env) : getSoccerFixtures(url, env));
   }
 };

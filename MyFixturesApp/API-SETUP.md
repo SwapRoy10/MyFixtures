@@ -1,5 +1,13 @@
 # Live schedule API setup
 
+## Major League Baseball
+
+Choose MLB in the sport selector to search all MLB teams and load games scheduled from the current day through the end of the calendar year. The Worker uses the BALLDONTLIE MLB `/mlb/v1/teams` and `/mlb/v1/games` endpoints with cursor pagination, so it retrieves more than the first 100 games when necessary. Regular-season and already-determined postseason games are included; completed and cancelled games are omitted.
+
+The provider does not expose a series identifier or a game number within a series. The browser therefore groups consecutive games against the same opponent and in the same season phase when they are no more than four days apart. Games stay in chronological order and become the Game 1, Game 2, and later tabs. Each game has its own Google Calendar action, each series has an **Add series** action, and the existing bulk actions include every remaining game with a confirmed start time.
+
+BALLDONTLIE makes the MLB Teams and Games endpoints available on its free tier, with a free-tier limit of five requests per minute. A `BALLDONTLIE_API_KEY` is required. The Worker caches team data for 12 hours and schedules for one hour to stay comfortably within that limit. See https://mlb.balldontlie.io/ for current provider documentation.
+
 ## Formula 1
 
 Choose Formula 1 in the sport selector to load the current calendar year's Grand Prix races. The schedule prefers the free Jolpica F1 race feed and falls back to BALLDONTLIE `/f1/v1/events?season=YEAR` and `/f1/v1/sessions?type=Race&event_ids[]=ID`, including cursor pagination. Practice, qualifying and sprint sessions are not included.
@@ -23,7 +31,7 @@ npx wrangler deploy
 
 5. Open the deployed Worker URL. It serves both the static app and `/api/fixtures`.
 
-The worker requests soccer schedules from football-data.org, cross-checks supported league kickoff times with ESPN, and supplements missing domestic cup, Europa League, and Conference League fixtures from ESPN's public schedules. A football-data.org placeholder is replaced only when ESPN marks the kickoff time as valid; otherwise the game remains honestly labeled TBD until its league confirms it. NFL schedules prefer ESPN and fall back to BALLDONTLIE. Played fixtures remain visible so each supported season is complete; the browser converts UTC timestamps to the selected time zone and includes the competition or league in each calendar event.
+The worker requests soccer schedules from football-data.org, cross-checks supported league kickoff times with ESPN, and supplements missing domestic cup, Europa League, and Conference League fixtures from ESPN's public schedules. A football-data.org placeholder is replaced only when ESPN marks the kickoff time as valid; otherwise the game remains honestly labeled TBD until its league confirms it. NFL schedules prefer ESPN and fall back to BALLDONTLIE. MLB teams and remaining games come from BALLDONTLIE. Played fixtures remain visible for soccer, NFL, and Formula 1; MLB intentionally begins with the current day. The browser converts UTC timestamps to the selected time zone and includes the competition or league in each calendar event.
 
 For the development Worker, set both secrets on the development Worker too:
 

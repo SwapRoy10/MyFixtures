@@ -1,6 +1,6 @@
 # MyFixtures
 
-MyFixtures is a responsive sports schedule website for following soccer clubs, NFL teams, and the Formula 1 season. It shows fixtures in the viewer's selected time zone and can export individual events, full schedules, or confirmed upcoming fixtures to Google Calendar.
+MyFixtures is a responsive sports schedule website for following soccer clubs, NFL and MLB teams, and the Formula 1 season. It shows fixtures in the viewer's selected time zone and can export individual events, full schedules, or confirmed upcoming fixtures to Google Calendar.
 
 ## Live sites
 
@@ -9,8 +9,10 @@ MyFixtures is a responsive sports schedule website for following soccer clubs, N
 
 ## Features
 
-- Search and save soccer clubs and NFL teams.
+- Search and save soccer, NFL, and MLB teams.
 - View full-season schedules, including completed events.
+- Browse remaining MLB games in series cards with Game 1, Game 2, and later-game tabs.
+- Add one MLB game, an entire series, or all remaining games to Google Calendar.
 - Follow Formula 1 Grand Prix races for the current calendar year.
 - Convert kickoff and race times to Eastern, Central, Mountain, Pacific, or British time.
 - Download one event or a complete schedule as an `.ics` calendar file.
@@ -22,6 +24,7 @@ MyFixtures is a responsive sports schedule website for following soccer clubs, N
 - Soccer league schedules come from [football-data.org](https://www.football-data.org/) and are cross-checked with ESPN for confirmed kickoff times.
 - ESPN supplements domestic cup, Europa League, and Conference League fixtures.
 - NFL schedules prefer ESPN and use [BALLDONTLIE](https://www.balldontlie.io/) as a fallback.
+- MLB team and game data comes from [BALLDONTLIE MLB](https://mlb.balldontlie.io/). Only games scheduled from the current day forward are shown; determined postseason games are included automatically.
 - Formula 1 schedules prefer [Jolpica F1](https://github.com/jolpica/jolpica-f1) and use BALLDONTLIE as a fallback.
 
 ## Technology
@@ -37,7 +40,7 @@ Requirements:
 
 - Node.js 24
 - A [football-data.org](https://www.football-data.org/client/register) API token for soccer data
-- An optional BALLDONTLIE API key for fallback NFL and Formula 1 data
+- A BALLDONTLIE API key for MLB data and optional fallback NFL and Formula 1 data
 
 From the application directory:
 
@@ -96,4 +99,3 @@ See [API-SETUP.md](MyFixturesApp/API-SETUP.md) for provider and Google Calendar 
 |   `-- wrangler.toml
 `-- README.md
 ```
-
