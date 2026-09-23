@@ -9,7 +9,7 @@ const year = Number(process.env.NHL_SEASON_YEAR || now.getUTCFullYear() - (now.g
 const season = `${year}${year + 1}`;
 let requestApp = url => fetch(url, { signal: AbortSignal.timeout(45000) });
 if (process.argv.includes('--local')) {
-  const source = await readFile(new URL('../worker.js', import.meta.url), 'utf8');
+  const source = await readFile(new URL('../worker.js', import.meta.url), 'utf8').then(text => text.replace("'./living-calendar.mjs'", JSON.stringify(new URL('../living-calendar.mjs', import.meta.url).href)));
   const worker = (await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)).default;
   const cache = new Map();
   globalThis.caches = { default: { match: async key => cache.get(key.url)?.clone(), put: async (key, value) => { cache.set(key.url, value.clone()); } } };

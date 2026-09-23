@@ -1,5 +1,39 @@
 # Live schedule API setup
 
+## Living Calendar and My Week
+
+`/calendar.html` combines up to 12 selections across all six sports. Create a subscription, wait for its initial schedules to finish, then subscribe to `/calendar/ID.ics`. Google Calendar's desktop **Add calendar → From URL** accepts the HTTPS URL; Apple Calendar and Outlook can also subscribe. No Google OAuth access is needed for this feature. Existing one-off exports and Google bulk sync remain separate.
+
+### Storage and refresh
+
+Deploy the `CALENDARS` Durable Object binding and `living-calendar-v1` SQLite migration already declared in `wrangler.toml`. No manually created database ID is required. Each Worker has its own subscription data. Do not remove the binding or migration when promoting development to production.
+
+Durable Object alarms refresh shared team snapshots approximately hourly without a browser open. BALLDONTLIE-backed sports are paced at least 65 seconds apart; one schedule can require several paginated provider requests. Provider failures retain the last good snapshot and retry with backoff. Initial multi-sport preparation can take several minutes; the first feed returns 503 with Retry-After until every selected team has loaded. Later provider failures do not erase published events. Background work expires after 90 days without a dashboard/feed read and resumes on the next read. Stopping a subscription releases team refreshes unless another active subscription uses them.
+
+Events keep stable UIDs and increment SEQUENCE for changes. Previously published events that are removed from a selection, cancelled or become TBD are retained as cancelled entries for client reconciliation. Unpublished TBD starts never become timed events. Missing fixtures require two complete snapshots before withdrawal; partial soccer/NFL responses cannot imply cancellations. Event end times and overlap detection use estimated durations. Retained event history is bounded to 400 days. Calendar clients decide their refresh interval and reminder behavior: changes are not instant push notifications.
+
+### API and management
+
+- `POST /api/calendars`: JSON settings; returns ID, revision and a one-time edit token.
+- `GET /api/calendars/ID`: view-only settings, combined games and readiness/delay status.
+- `PUT /api/calendars/ID`: update settings using `Authorization: Bearer EDIT_TOKEN` and the current revision; stale writes return 409.
+- `DELETE /api/calendars/ID`: owner-only stop; the feed remains readable with withdrawn events so existing subscribers can reconcile.
+- `GET` or `HEAD /calendar/ID.ics`: calendar subscription with ETag/304 support.
+
+The browser saves the edit token locally. The private management link carries it in a URL fragment, not a query string. Only its hash is stored server-side. Anyone with a dashboard or subscription URL can read the selection, but cannot edit without the token. Keep management links private. Clearing browser storage without saving that link loses edit access. Anonymous creation is capped at 20 subscriptions per IP/hour; request bodies and team selections are bounded.
+
+### Verification
+
+Run `npm test` for mocked-provider, event reconciliation, timezone, authorization, persistence and cleanup tests. With a local Worker running, `npm run audit:living -- http://localhost:8787` exercises real NHL data without provider keys. Against development, use:
+
+```text
+npm run audit:living -- https://my-fixtures-api-development.sorp.workers.dev --all-sports
+```
+
+This creates a disposable subscription and stops it afterward, checking readiness, deduplication, feed contents, caching, unauthorized writes and stable IDs after settings changes. It does not add events to an actual calendar account. Provider keys must be configured for all-sport checks. Allow several minutes for the initial background queue.
+
+If Wrangler's local asset watcher continuously reloads because the asset directory is the project root, use `npm run preview:stable` and restart it after code changes.
+
 ## NHL
 
 NHL uses the league's public Web API, with no API key or BALLDONTLIE subscription. Select NHL and search/save any active team; the default is the Philadelphia Flyers.

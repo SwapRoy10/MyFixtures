@@ -2,6 +2,7 @@ node_modules/
 scripts/
 *.test.mjs
 worker.js
+living-calendar.mjs
 DEVELOPMENT-WORKFLOW.md
 package.json
 package-lock.json

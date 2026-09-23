@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import vm from 'node:vm';
 
-const source = await readFile(new URL('./worker.js', import.meta.url), 'utf8');
+const source = await readFile(new URL('./worker.js', import.meta.url), 'utf8').then(text => text.replace("'./living-calendar.mjs'", JSON.stringify(new URL('./living-calendar.mjs', import.meta.url).href)));
 const worker = (await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)).default;
 const flyers = { id: 4, abbrev: 'PHI', name: { default: 'Philadelphia Flyers' }, placeName: { default: 'Philadelphia' }, commonName: { default: 'Flyers' }, logo: 'https://assets.nhle.com/logos/nhl/svg/PHI_light.svg' };
 const habs = { id: 8, abbrev: 'MTL', name: { default: 'Montréal Canadiens' }, placeName: { default: 'Montréal' }, commonName: { default: 'Canadiens' } };

@@ -29,6 +29,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Run regression tests
+        run: npm test
+
       - name: Verify Cloudflare deployment secrets
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then

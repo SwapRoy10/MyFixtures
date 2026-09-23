@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="referrer" content="no-referrer">
+  <title>MyFixtures | Living Calendar</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="calendar.css">
+</head>
+<body>
+  <main class="shell living-shell">
+    <header class="topbar"><a class="brand" href="/">MyFixtures</a><a class="back-link" href="/">Browse team schedules</a></header>
+    <section class="living-intro"><p class="eyebrow">All your teams. One calendar.</p><h1>Your week,<br><em>in play.</em></h1><p>Follow teams across sports with one calendar subscription. Game times, venues and newly announced matchups update as schedules change.</p></section>
+    <div class="living-layout">
+      <section class="living-settings" aria-labelledby="settings-title">
+        <h2 id="settings-title">Build your calendar</h2>
+        <p id="ownership-note">No account needed. Your private management link lets you edit this calendar on another device.</p>
+        <form id="team-search-form">
+          <label for="search-sport">Sport</label><select id="search-sport"><option value="soccer">Soccer</option><option value="nfl">NFL</option><option value="mlb">MLB</option><option value="nba">NBA</option><option value="nhl">NHL</option><option value="f1">Formula 1</option></select>
+          <label for="living-team-search">Team</label><div class="search-row"><input id="living-team-search" placeholder="Team name or abbreviation" maxlength="80"><button class="button button-outline" type="submit">Find teams</button></div>
+          <div id="team-search-results" aria-live="polite"></div>
+        </form>
+        <h3>Your selections <span id="selected-count">0 / 12</span></h3><ul id="selected-teams" class="team-chips"></ul>
+        <form id="calendar-settings">
+          <label for="calendar-name">Calendar name</label><input id="calendar-name" maxlength="80" required value="MyFixtures Living Calendar">
+          <label for="living-timezone">Time zone</label><select id="living-timezone"><option value="America/New_York">Eastern Time</option><option value="America/Chicago">Central Time</option><option value="America/Denver">Mountain Time</option><option value="America/Los_Angeles">Pacific Time</option><option value="Europe/London">British Time</option><option value="Europe/Paris">Central European Time</option><option value="Asia/Kolkata">India Time</option><option value="Asia/Tokyo">Japan Time</option><option value="Australia/Sydney">Sydney Time</option></select>
+          <div class="calendar-checks"><label><input type="checkbox" id="include-completed"> Include completed games</label><label><input type="checkbox" id="include-preseason" checked> Include preseason</label><label><input type="checkbox" id="include-postseason" checked> Include postseason</label></div>
+          <label for="calendar-reminder">Reminder before each game</label><select id="calendar-reminder"><option value="0">No reminder</option><option value="15">15 minutes</option><option value="30" selected>30 minutes</option><option value="60">1 hour</option><option value="1440">1 day</option></select>
+          <p class="field-note">Your calendar app may use its own notification settings.</p>
+          <button id="save-calendar" class="button button-solid" type="submit">Create my calendar</button>
+          <button id="stop-calendar" class="text-button" type="button" hidden>Stop this subscription</button>
+        </form>
+        <p id="settings-message" role="status" aria-live="polite"></p>
+      </section>
+      <section class="living-main" aria-labelledby="week-title">
+        <section id="subscription-panel" class="subscription-panel" hidden>
+          <p class="eyebrow">Subscribe once. Stay up to date.</p><h2>Your Living Calendar</h2>
+          <p>Subscribe with this link so future changes reach your calendar. Downloading or importing a file once does not keep it updated.</p>
+          <label for="feed-url">Calendar subscription URL</label><input id="feed-url" readonly>
+          <p id="feed-readiness" role="status"></p>
+          <div class="subscription-actions"><button id="copy-feed" class="button button-solid" type="button">Copy calendar link</button><a id="webcal-link" class="button button-outline" href="#">Open calendar app</a><a id="google-subscribe" class="button button-outline" href="https://calendar.google.com/calendar/u/0/r/settings/addbyurl" target="_blank" rel="noreferrer">Google Calendar</a></div>
+          <details><summary>How to subscribe</summary><p>Google Calendar: on the desktop website, open Settings → Add calendar → From URL and paste the link above. Apple Calendar: choose New Calendar Subscription. Outlook: choose Add calendar → Subscribe from web.</p><p>We refresh team schedules about hourly. Your calendar app controls when it checks the subscription, so updates may take several hours. Unconfirmed times appear below but are excluded from the feed until confirmed. Previously exported entries are withdrawn if their time becomes unconfirmed.</p><p>If you previously imported these games, remove that old import to avoid duplicates. This subscription cannot edit events from an earlier import.</p></details>
+          <details id="manage-details"><summary>Manage or share this calendar</summary><label for="manage-url">Private management link — keep this to edit on another device</label><input id="manage-url" readonly><button id="copy-manage" class="text-button" type="button">Copy private management link</button><label for="share-url">View-only dashboard link</label><input id="share-url" readonly><button id="copy-share" class="text-button" type="button">Copy dashboard link</button><p>Anyone with the subscription or dashboard link can view your selected teams and schedule. Only the private management link can change your settings.</p></details>
+          <p id="copy-message" role="status"></p>
+        </section>
+        <div class="week-heading"><div><p class="eyebrow">Your sports agenda</p><h2 id="week-title">My Week</h2></div><button id="refresh-calendar" class="text-button" type="button" hidden>Refresh view</button></div>
+        <div class="week-filters"><label>Show<select id="week-period"><option value="week">This week</option><option value="today">Today</option><option value="weekend">This weekend</option><option value="season">Full season</option></select></label><label>Sport<select id="week-sport"><option value="all">All sports</option><option value="soccer">Soccer</option><option value="nfl">NFL</option><option value="mlb">MLB</option><option value="nba">NBA</option><option value="nhl">NHL</option><option value="f1">Formula 1</option></select></label><label class="postseason-filter"><input id="week-postseason" type="checkbox"> Postseason only</label></div>
+        <p id="schedule-status" role="status" aria-live="polite">Choose your teams, then create a calendar to see their combined schedule.</p>
+        <p id="overlap-note" class="field-note" hidden>Overlaps use estimated game durations; actual finishing times can vary.</p>
+        <div id="week-games"></div>
+      </section>
+    </div>
+    <footer><span>MyFixtures</span><span>Built for matchday people</span></footer>
+  </main>
+  <script type="module" src="calendar-ui.mjs?v=20260923-living-1"></script>
+</body>
+</html>

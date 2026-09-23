@@ -5,8 +5,10 @@
     "test": "node --test",
     "audit:nba": "node scripts/audit-nba.mjs",
     "audit:nhl": "node scripts/audit-nhl.mjs",
+    "audit:living": "node scripts/audit-living.mjs",
     "deploy": "wrangler deploy",
-    "preview": "wrangler dev"
+    "preview": "wrangler dev",
+    "preview:stable": "node scripts/preview-stable.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.129.0"

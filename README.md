@@ -9,6 +9,9 @@ MyFixtures is a responsive sports schedule website for following soccer clubs, N
 
 ## Features
 
+- Combine up to 12 teams across sports in a persistent Living Calendar subscription.
+- See a combined My Week agenda with Today, Weekend, Full season, sport and postseason filters, plus estimated game overlaps.
+- Keep subscribed events updated as confirmed times, venues and matchups change; edit selections and reminders without replacing the subscription link.
 - Search and save soccer, NFL, MLB, NBA, and NHL teams.
 - Follow NHL preseason, regular-season and published Stanley Cup playoff games, with individual and full-season calendar actions.
 - Follow NBA preseason, regular-season, NBA Cup, Play-In and playoff games as matchups are published, with individual Google Calendar buttons and season-wide exports.
@@ -74,7 +77,20 @@ Do not commit `.dev.vars`, `.env` files, API keys, or Google client secrets.
 cd MyFixturesApp
 npm test
 npx wrangler deploy --dry-run
+npm run audit:living -- http://localhost:8787
 ```
+
+The Living Calendar audit creates and stops its own disposable NHL subscription. Add `--all-sports` to check all six sports against a configured development Worker. It may take several minutes while initial schedules load. It never writes to a user's Google, Apple or Outlook calendar.
+
+## Living Calendar
+
+Open **My Week & Living Calendar**, select your teams, and create your calendar. Once schedules finish preparing, subscribe using the provided URL in Google Calendar (Settings → Add calendar → From URL), Apple Calendar or Outlook. Importing a downloaded file once is not a subscription.
+
+Save the private management link to edit your selection on another device. The subscription and dashboard links are view-only but reveal your chosen teams to anyone holding them. No account is required. Losing both the management link and browser storage means creating a new calendar.
+
+Schedules refresh approximately hourly in the background. Calendar applications control their own polling and may take several hours to display changes. Unconfirmed times are excluded from the feed until confirmed. Overlap detection uses estimated game lengths; reminder support depends on the calendar application. Only published matchups are available, including postseason games as providers announce them.
+
+The Worker uses the `CALENDARS` SQLite Durable Object binding and migration in `wrangler.toml`. Development and production have separate subscription data and URLs. Ordinary one-off exports remain available and unchanged.
 
 ## Deployment
 

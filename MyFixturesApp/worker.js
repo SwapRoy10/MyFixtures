@@ -1,3 +1,5 @@
+import { LivingCalendarStore, routeCalendarRequest } from './living-calendar.mjs';
+
 const rosterCache = new Map();
 const nflTeamsCache = { created: 0, teams: [] };
 const mlbTeamsCache = { created: 0, teams: [] };
@@ -592,7 +594,8 @@ function normalizeEspnNflGame(event, teamAbbreviation) {
   const selected = competitors.find(entry => entry.team?.abbreviation?.toLowerCase() === teamAbbreviation.toLowerCase());
   const opponent = competitors.find(entry => entry.team?.abbreviation?.toLowerCase() !== teamAbbreviation.toLowerCase());
   const seasonType = event.seasonType?.name || 'NFL';
-  const timeTbd = event.timeValid === false || competition.timeValid === false;
+  const providerStatus = competition.status?.type?.name || event.status?.type?.name || '';
+  const timeTbd = event.timeValid === false || competition.timeValid === false || /postpon|suspend/i.test(providerStatus);
   return {
     id: event.id,
     sport: 'nfl',
@@ -602,7 +605,7 @@ function normalizeEspnNflGame(event, teamAbbreviation) {
     venue: competition.venue?.fullName || '',
     competition: event.week?.text ? `${seasonType} - ${event.week.text}` : seasonType,
     home: selected?.homeAway === 'home',
-    status: event.status?.type?.state || 'scheduled',
+    status: /cancel|postpon|suspend|abandon/i.test(providerStatus) ? providerStatus.toLowerCase() : event.status?.type?.state || 'scheduled',
     provider: 'espn'
   };
 }
@@ -703,7 +706,7 @@ async function getMlbPages(query, env) {
   }
 }
 
-async function getMlbFixtures(url, env) {
+async function getMlbFixtures(url, env, options = {}) {
   const teamId = Number(url.searchParams.get('team'));
   if (!teamId) return errorResponse('A BALLDONTLIE MLB team id is required.', 400);
   if (!env.BALLDONTLIE_API_KEY) return errorResponse('BALLDONTLIE_API_KEY is required for MLB schedules.');
@@ -718,7 +721,7 @@ async function getMlbFixtures(url, env) {
 
   try {
     const query = new URLSearchParams({ 'team_ids[]': String(teamId), 'seasons[]': dateFrom.slice(0, 4) });
-    const excluded = new Set(['final', 'completed', 'canceled', 'cancelled', 'abandoned']);
+    const excluded = new Set(options.history ? [] : ['final', 'completed', 'canceled', 'cancelled', 'abandoned']);
     const games = await getMlbPages(query, env);
     const fixtures = [...new Map(games.filter(game => {
       const gameDate = game.date?.slice(0, 10);
@@ -847,8 +850,28 @@ async function getF1Fixtures(url, env) {
   }
 }
 
+export class CalendarStore extends LivingCalendarStore {
+  constructor(ctx, env) {
+    super(ctx, env, async (team, range) => {
+      const url = new URL('https://myfixtures.internal/api/fixtures');
+      url.search = new URLSearchParams({ sport: team.sport, team: String(team.id), teamName: team.name,
+        teamAbbreviation: team.abbreviation, competitions: team.competitions.join(','), dateFrom: range.from, dateTo: range.to });
+      const loader = { soccer: getSoccerFixtures, nfl: getNflFixtures, nba: getNbaFixtures, nhl: getNhlFixtures, f1: getF1Fixtures, mlb: getMlbFixtures }[team.sport];
+      const response = await loader(url, env, { history: true });
+      if (!response.ok) throw new Error('Schedule provider unavailable');
+      const data = await response.json();
+      if (!Array.isArray(data.fixtures) || Object.keys(data.errors || {}).length) throw new Error('Incomplete schedule response');
+      // Soccer/NFL can supplement partial upstream feeds. Missing entries in
+      // those feeds must not be interpreted as cancellations.
+      return { ...data, complete: ['nhl', 'nba', 'mlb', 'f1'].includes(team.sport) };
+    });
+  }
+}
+
 export default {
   async fetch(request, env) {
+    const calendarResponse = routeCalendarRequest(request, env);
+    if (calendarResponse) return calendarResponse;
     const url = new URL(request.url);
     if (url.pathname !== '/api/fixtures' && url.pathname !== '/api/teams') {
       const assetResponse = await env.ASSETS.fetch(request);
