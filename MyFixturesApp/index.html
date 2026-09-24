@@ -76,14 +76,16 @@
       <div class="control-actions">
         <button id="add-fixture" class="button button-outline" type="button"><span>＋</span> Add fixture</button>
         <button id="google-all" class="button button-solid" type="button"><span>＋</span> Add all to Google Calendar</button>
-        <button id="export-all" class="button button-outline" type="button"><span>↓</span> Download all</button>
+        <button id="export-all" class="button button-outline" type="button"><span>↓</span> Download all (one-time)</button>
       </div>
     </section>
 
     <section class="fixture-section">
       <div class="section-heading"><div><p class="eyebrow">Current season</p><h2>Every team. <span>Every match.</span></h2></div><p class="timezone" id="timezone-label">Times shown in Eastern Time</p></div>
       <div id="fixture-list" class="fixture-list"></div>
-      <p class="source-note" id="source-note">Schedule source: <a href="https://www.arsenal.com/fixtures/men/fixtures" target="_blank" rel="noreferrer">Arsenal.com fixtures</a>. TBC rows await official publication.</p>
+      <p id="schedule-health" class="source-note" role="status">Checking the published schedule…</p><button id="retry-schedule" class="text-button" type="button">Retry schedule</button>
+      <p class="source-note">Downloads and Google Calendar additions are one-time copies. <a href="/calendar.html">Subscribe for automatic updates and advanced filters</a>. Avoid importing again if you already subscribe.</p>
+      <p class="source-note" id="source-note">Loading the published schedule. Unconfirmed times remain TBD until the provider confirms them.</p>
     </section>
 
     <section class="how-it-works"><span class="step-number">01</span><p><strong>Calendar-ready files</strong><br>Downloads open in Apple Calendar, Google Calendar, Outlook, and more.</p><span class="step-line"></span><span class="step-number">02</span><p><strong>Stay in the loop</strong><br>Fixture details live here, while your calendar handles the reminder.</p></section>
@@ -112,6 +114,6 @@
     </form>
   </dialog>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="app.js?v=20260922-nhl-1"></script>
+  <script src="app.js?v=20260924-reliability-2"></script>
 </body>
 </html>

@@ -6,6 +6,7 @@
     "audit:nba": "node scripts/audit-nba.mjs",
     "audit:nhl": "node scripts/audit-nhl.mjs",
     "audit:living": "node scripts/audit-living.mjs",
+    "audit:seasons": "node scripts/audit-seasons.mjs",
     "deploy": "wrangler deploy",
     "preview": "wrangler dev",
     "preview:stable": "node scripts/preview-stable.mjs"

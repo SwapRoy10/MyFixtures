@@ -1,4 +1,6 @@
-import { conflictKeys, filterGames, gameDate } from './calendar-view.mjs';
+import { conflictKeys, filterGames, gameDate, groupWeekSeries, googleGameUrl, describeChange } from './calendar-view.mjs';
+import { confirmedOpponent } from './schedule-common.mjs';
+import { calendarGuides } from './calendar-guides.mjs';
 
 const $ = id => document.getElementById(id);
 const escape = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -22,6 +24,8 @@ let stopped = false;
 let loading = false;
 let loadGeneration = 0;
 let dirty = false;
+let chosenCompetitions = [];
+const openSeries = new Set(), activeGames = new Map();
 let teams = (stored('fixture-saved-clubs') || []).map(t => ({ ...t, sport: t.sport || 'soccer' })).slice(0, 12);
 if (!teams.length) {
   const selected = stored('fixture-current-team');
@@ -70,7 +74,9 @@ $('team-search-form').addEventListener('submit', async event => {
 
 function config() { return { teams, name: $('calendar-name').value.trim(), timeZone: $('living-timezone').value,
   includeCompleted: $('include-completed').checked, includePreseason: $('include-preseason').checked,
-  includePostseason: $('include-postseason').checked, reminder: Number($('calendar-reminder').value), revision }; }
+  includePostseason: $('include-postseason').checked, reminder: Number($('calendar-reminder').value), revision,
+  venueFilter: $('venue-filter').value, dateFrom: $('calendar-date-from').value, dateTo: $('calendar-date-to').value,
+  competitionFilters: $('competition-mode').value === 'selected' ? chosenCompetitions : [] }; }
 function populate(value) {
   teams = value.teams; renderTeams();
   $('calendar-name').value = value.name;
@@ -80,7 +86,31 @@ function populate(value) {
   $('include-preseason').checked = value.includePreseason;
   $('include-postseason').checked = value.includePostseason;
   $('calendar-reminder').value = String(value.reminder);
+  $('venue-filter').value = value.venueFilter || 'all';
+  $('calendar-date-from').value = value.dateFrom || '';
+  $('calendar-date-to').value = value.dateTo || '';
+  chosenCompetitions = [...(value.competitionFilters || [])];
+  $('competition-mode').value = chosenCompetitions.length ? 'selected' : 'all';
+  renderCompetitions();
 }
+function renderCompetitions() {
+  const options = new Map((state?.competitions || []).map(c => [c.key, c]));
+  for (const code of chosenCompetitions) if (!options.has(code)) options.set(code, { key: code, name: `${code} (not currently published)`, sport: '' });
+  $('competition-choices').hidden = $('competition-mode').value !== 'selected';
+  $('competition-choices').innerHTML = [...options.values()].map(c => `<label><input type="checkbox" value="${escape(c.key)}" ${chosenCompetitions.includes(c.key) ? 'checked' : ''} ${!canEdit || stopped ? 'disabled' : ''}> ${escape(c.sport.toUpperCase())} · ${escape(c.name)}</label>`).join('');
+  $('competition-note').textContent = options.size ? 'Selections affect both My Week and your subscription. Only “All competitions” automatically includes newly added competition types.' : 'Create your calendar first. Competition choices appear when its schedules load.';
+  $('competition-choices').querySelectorAll('input').forEach(input => input.addEventListener('change', () => {
+    chosenCompetitions = [...$('competition-choices').querySelectorAll('input:checked')].map(c => c.value); dirty = true;
+  }));
+}
+$('competition-mode').addEventListener('change', () => { dirty = true; renderCompetitions(); });
+function renderGuide() {
+  const guide = calendarGuides[$('calendar-app').value] || calendarGuides.google;
+  $('subscription-instructions').innerHTML = `<ol>${guide.steps.map(step => `<li>${escape(step)}</li>`).join('')}</ol><p>${escape(guide.note)}</p><a href="${escape(guide.source)}" target="_blank" rel="noreferrer">Official setup instructions</a>`;
+}
+$('calendar-app').addEventListener('change', renderGuide);
+$('imported-before').addEventListener('change', () => { $('duplicate-help').hidden = !$('imported-before').checked; });
+renderGuide();
 function links() {
   $('subscription-panel').hidden = !id || stopped;
   if (!id) return;
@@ -90,7 +120,7 @@ function links() {
   const ready = state?.ready === true;
   $('copy-feed').disabled = !ready;
   $('feed-readiness').textContent = ready ? 'Your feed is ready to subscribe.' : 'Preparing the first schedules. Subscription buttons become available when all selected teams are ready.';
-  for (const [control, href] of [['webcal-link', feed.replace(/^https?:/, 'webcal:')], ['google-subscribe', 'https://calendar.google.com/calendar/u/0/r/settings/addbyurl']]) {
+  for (const [control, href] of [['webcal-link', feed.replace(/^https?:/, 'webcal:')], ['google-subscribe', 'https://calendar.google.com/calendar/u/0/r/settings/addbyurl'], ['download-once', feed]]) {
     if (ready) $(control).setAttribute('href', href); else $(control).removeAttribute('href');
     $(control).setAttribute('aria-disabled', String(!ready));
   }
@@ -111,12 +141,48 @@ function renderDashboard() {
   const formatter = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', month: 'short', day: 'numeric', weekday: 'short' });
   const time = new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
   $('overlap-note').hidden = !games.some(g => conflicts.has(g.key));
-  $('week-games').innerHTML = games.length ? games.map(game => {
-    const cancelled = /cancel|abandon/i.test(game.status || '');
-    const pending = game.timeTbd || /postpon|suspend|^ppd$/i.test(game.status || '');
+  const card = game => {
+    const cancelled = /cancel|abandon|^cncl$/i.test(game.status || '');
+    const pending = game.timeTbd || !confirmedOpponent(game) || /postpon|suspend|^ppd$/i.test(game.status || '');
     const date = gameDate(game, timeZone);
-    return `<article class="week-card${cancelled ? ' cancelled-game' : ''}"><time datetime="${escape(date)}">${escape(formatter.format(new Date(`${date}T12:00:00Z`)))}<span>${pending ? 'Time TBD' : escape(time.format(new Date(game.utcDate)))}</span></time><div><small>${escape(game.sport)} · ${escape(game.competition)}</small><h3>${escape(game.title)}</h3>${game.venue ? `<p>${escape(game.venue)}</p>` : ''}${game.selectedTeams.length > 1 ? '<p>Both of your teams · one calendar event</p>' : ''}${cancelled ? '<span class="status-badge">Cancelled / removed</span>' : pending ? '<span class="status-badge">Awaiting confirmed time</span>' : conflicts.has(game.key) ? '<span class="overlap-badge">Overlaps another game</span>' : ''}</div></article>`;
-  }).join('') : '<div class="empty-week">No games match this view. Try Full season or adjust your filters.</div>';
+    const google = googleGameUrl(game);
+    return `<article class="week-card${cancelled ? ' cancelled-game' : ''}"><time datetime="${escape(date)}">${escape(formatter.format(new Date(`${date}T12:00:00Z`)))}<span>${pending ? 'Unconfirmed' : escape(time.format(new Date(game.utcDate)))}</span></time><div><small>${escape(game.sport)} · ${escape(game.competition)}</small><h3>${escape(game.title)}</h3>${game.venue ? `<p>${escape(game.venue)}</p>` : ''}${game.selectedTeams.length > 1 ? '<p>Both of your teams · one calendar event</p>' : ''}${cancelled ? '<span class="status-badge">Cancelled / removed</span>' : pending ? '<span class="status-badge">Awaiting confirmed time or matchup</span>' : conflicts.has(game.key) ? '<span class="overlap-badge">Overlaps another game</span>' : ''}${google ? `<p><a href="${escape(google)}" target="_blank" rel="noreferrer">Add once to Google Calendar</a> <small>Skip this if you already subscribe.</small></p>` : ''}</div></article>`;
+  };
+  const visible = new Set(games.map(g => g.key));
+  const groups = groupWeekSeries(state.games || []).map(group => ({ ...group, shown: group.games.map((game, index) => ({ game, number: index + 1 })).filter(({ game }) => visible.has(game.key)) })).filter(g => g.shown.length);
+  $('week-games').innerHTML = groups.length ? groups.map((group, index) => {
+    if (group.games.length === 1) return card(group.shown[0].game);
+    const active = group.shown.some(g => g.game.key === activeGames.get(group.key)) ? activeGames.get(group.key) : group.shown[0].game.key;
+    const tabs = group.shown.map(({ game, number }) => `<button type="button" role="tab" id="week-${index}-${number}-tab" aria-controls="week-${index}-${number}-panel" aria-selected="${game.key === active}" tabindex="${game.key === active ? '0' : '-1'}" data-week-tab="${escape(game.key)}">Game ${number}</button>`).join('');
+    const panels = group.shown.map(({ game, number }) => `<div role="tabpanel" id="week-${index}-${number}-panel" aria-labelledby="week-${index}-${number}-tab" ${game.key === active ? '' : 'hidden'}>${card(game)}</div>`).join('');
+    return `<details class="week-series" data-series-key="${escape(group.key)}" ${openSeries.has(group.key) ? 'open' : ''}><summary>${escape(group.games[0].title)} <span>${group.shown.length} of ${group.games.length} games in this view</span></summary><p class="field-note">MLB series inferred from consecutive published matchups. Game numbers refer to the currently loaded series; calendar entries remain individual games.</p><div class="week-tabs" role="tablist" aria-label="Games in ${escape(group.games[0].title)}">${tabs}</div>${panels}</details>`;
+  }).join('') : '<div class="empty-week">No games match this view. Try Full season or adjust your saved calendar filters.</div>';
+  $('week-games').querySelectorAll('.week-series').forEach(series => {
+    series.addEventListener('toggle', () => { if (series.open) openSeries.add(series.dataset.seriesKey); else openSeries.delete(series.dataset.seriesKey); });
+    const tabs = [...series.querySelectorAll('[role="tab"]')];
+    const activate = tab => {
+      activeGames.set(series.dataset.seriesKey, tab.dataset.weekTab);
+      tabs.forEach(t => { t.setAttribute('aria-selected', String(t === tab)); t.tabIndex = t === tab ? 0 : -1; });
+      series.querySelectorAll('[role="tabpanel"]').forEach(p => { p.hidden = p.id !== tab.getAttribute('aria-controls'); });
+    };
+    tabs.forEach((tab, index) => {
+      tab.addEventListener('click', () => activate(tab));
+      tab.addEventListener('keydown', event => {
+        const target = event.key === 'ArrowRight' ? tabs[(index + 1) % tabs.length] : event.key === 'ArrowLeft' ? tabs[(index + tabs.length - 1) % tabs.length] : event.key === 'Home' ? tabs[0] : event.key === 'End' ? tabs.at(-1) : null;
+        if (target) { event.preventDefault(); activate(target); target.focus(); }
+      });
+    });
+  });
+  renderInsights(timeZone);
+}
+
+function renderInsights(timeZone) {
+  const date = value => value ? new Date(value).toLocaleString(undefined, { timeZone }) : 'Not checked yet';
+  const statuses = { current: 'Published schedule loaded', preparing: 'Preparing first schedule', unavailable: 'Provider unavailable', stale: 'Update delayed — saved schedule retained', partial: 'Partial coverage — some sources missing', unpublished: 'No games published yet', 'season-pending': 'New season — awaiting first successful refresh' };
+  const reasons = { 'rate-limit': 'Provider rate limit reached; retrying automatically.', access: 'Provider access needs attention.', timeout: 'Provider request timed out; retrying automatically.', provider: 'Provider response unavailable or invalid; retrying automatically.' };
+  $('team-health').innerHTML = (state.health || []).map(h => `<article class="health-card"><h3>${escape(h.name)}</h3><p>${escape(statuses[h.state] || h.state)}</p><p>Season ${escape(h.season.from)} to ${escape(h.season.to)} · ${h.games} published games · ${h.unconfirmed} unconfirmed</p><p>Last check: ${escape(date(h.checkedAt))}<br>Last successful update: ${escape(date(h.updated))}</p><p>${escape(h.coverage === 'published' ? 'Published feed retrieved. Undetermined games may appear later.' : h.coverage === 'partial' ? 'Incomplete source coverage.' : 'Full coverage cannot be independently confirmed.')}${h.reason ? ` ${escape(reasons[h.reason] || '')}` : ''}</p></article>`).join('') || '<p>Create your calendar to see per-team status.</p>';
+  $('changes-count').textContent = state.changes?.length ? `(${state.changes.length})` : '';
+  $('schedule-changes').innerHTML = state.changes?.length ? state.changes.map(change => `<article class="change-card"><h3>${escape(change.title)}</h3><p>${escape(describeChange(change, timeZone))}</p><small>Detected ${escape(date(change.at))} · ${escape(change.competition)}</small></article>`).join('') : '<p>No provider changes recorded yet. The first refresh establishes the baseline.</p>';
 }
 
 async function loadCalendar({ populateSettings = false } = {}) {
@@ -152,6 +218,8 @@ $('calendar-settings').addEventListener('input', () => { dirty = true; });
 $('calendar-settings').addEventListener('submit', async event => {
   event.preventDefault(); if (!canEdit || stopped) return;
   if (!teams.length) { $('settings-message').textContent = 'Choose at least one team or championship.'; return; }
+  if ($('competition-mode').value === 'selected' && !chosenCompetitions.length) { $('settings-message').textContent = 'Choose at least one competition, or select All competitions.'; return; }
+  if ($('calendar-date-from').value && $('calendar-date-to').value && $('calendar-date-from').value > $('calendar-date-to').value) { $('settings-message').textContent = 'The start date must be before the end date.'; return; }
   $('save-calendar').disabled = true;
   loadGeneration++; loading = false; clearTimeout(timer);
   $('settings-message').textContent = 'Saving your calendar…';

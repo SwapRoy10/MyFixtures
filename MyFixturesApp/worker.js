@@ -255,7 +255,7 @@ async function fetchProviderJson(providerUrl, headers, ttlSeconds) {
   const cached = await cache.match(cacheKey);
   if (cached) return { ok: true, status: cached.status, payload: await cached.json(), fromCache: true };
 
-  const response = await fetch(providerUrl, { headers });
+  const response = await fetch(providerUrl, { headers, signal: AbortSignal.timeout(20000) });
   const body = await response.text();
   let payload;
   try {
@@ -294,6 +294,7 @@ function apiCacheKey(request) {
   const url = new URL(request.url);
   url.searchParams.delete('_');
   url.searchParams.delete('v');
+  url.searchParams.set('__cache_schema', '2');
   return new Request(url.toString(), request);
 }
 
@@ -318,7 +319,33 @@ async function withApiCache(request, ttlSeconds, handler) {
     headers.set('x-myfixtures-cache', 'HIT');
     return new Response(cached.body, { status: cached.status, statusText: cached.statusText, headers });
   }
-  const response = await handler();
+  const schedule = new URL(request.url).pathname === '/api/fixtures';
+  const staleUrl = new URL(key.url); staleUrl.searchParams.set('__snapshot', 'last-good');
+  const staleKey = new Request(staleUrl);
+  let response;
+  try { response = await handler(); } catch { response = errorResponse('Schedule provider temporarily unavailable. Please retry.', 502); }
+  let body;
+  if (schedule && response.ok) {
+    body = await response.clone().json();
+    if (!Array.isArray(body.fixtures) || Object.keys(body.errors || {}).length) response = errorResponse('Invalid schedule response.', 502);
+  }
+  const previous = schedule && (!response.ok || body?.coverage === 'partial' || !body?.fixtures?.length) ? await cache.match(staleKey) : null;
+  if (previous && (response.status >= 500 || response.status === 429 || [401, 403].includes(response.status) || body?.coverage === 'partial' || (body?.fixtures?.length === 0 && (await previous.clone().json()).fixtures?.some(g => Date.parse(g.utcDate) > Date.now())))) {
+    const saved = await previous.json();
+    saved.health = { ...saved.health, state: 'stale', attemptedAt: Date.now(), reason: response.status === 429 ? 'rate-limit' : [401, 403].includes(response.status) ? 'access' : body?.coverage === 'partial' ? 'partial' : 'provider' };
+    return new Response(JSON.stringify(saved), { headers: { ...jsonHeaders, 'cache-control': 'no-store', 'x-myfixtures-cache': 'STALE' } });
+  }
+  if (schedule && response.ok) {
+    const sport = new URL(request.url).searchParams.get('sport') || 'soccer';
+    const coverage = body.coverage || (['soccer', 'nfl'].includes(sport) ? 'unverified' : 'published');
+    body.health = { checkedAt: Date.now(), updated: Date.now(), state: coverage === 'partial' ? 'partial' : body.fixtures.length ? 'current' : 'unpublished', coverage };
+    response = new Response(JSON.stringify(body), { headers: response.headers });
+    if (coverage === 'partial') {
+      response.headers.set('cache-control', 'no-store');
+      return response;
+    }
+    if (coverage !== 'partial') await cache.put(staleKey, new Response(JSON.stringify(body), { headers: { ...jsonHeaders, 'cache-control': 'public, max-age=604800' } }));
+  }
   if (!shouldCacheApiResponse(response)) return response;
   const cacheableResponse = cacheableJsonResponse(response, ttlSeconds);
   await cache.put(key, cacheableResponse.clone());
@@ -527,7 +554,7 @@ async function getSoccerFixtures(url, env) {
     const footballFixtures = uniqueFixtures([...competitionFixtures, ...teamFixtures].map(match => normalizeFootballDataMatch(match, teamId)));
     const fixtures = mergeSoccerFixtures(footballFixtures, espnFixtures);
     if (fixtures.length || !providerUnavailable) {
-      return new Response(JSON.stringify({ fixtures, errors: {}, results: fixtures.length, source: espnFixtures.length ? 'football-data+espn' : 'football-data' }), { status: 200, headers: jsonHeaders });
+      return new Response(JSON.stringify({ fixtures, errors: {}, results: fixtures.length, coverage: schedules.some(matches => matches === null) || !teamFixturePayload.ok ? 'partial' : 'unverified', source: espnFixtures.length ? 'football-data+espn' : 'football-data' }), { status: 200, headers: jsonHeaders });
     }
   }
 
@@ -539,7 +566,7 @@ async function getSoccerFixtures(url, env) {
 
   if (espnFixtures.length) {
     const fixtures = uniqueFixtures(espnFixtures);
-    return new Response(JSON.stringify({ fixtures, errors: {}, results: fixtures.length, source: 'espn' }), { status: 200, headers: jsonHeaders });
+    return new Response(JSON.stringify({ fixtures, errors: {}, results: fixtures.length, coverage: 'partial', source: 'espn' }), { status: 200, headers: jsonHeaders });
   }
 
   return getTeamFixtures(teamId, dateFrom, dateTo, headers);
@@ -549,7 +576,7 @@ async function getNflTeams(env) {
   if (nflTeamsCache.teams.length && Date.now() - nflTeamsCache.created < nflTeamsCacheDuration) return nflTeamsCache.teams;
   if (!env.BALLDONTLIE_API_KEY) return null;
   const response = await fetch('https://api.balldontlie.io/nfl/v1/teams', {
-    headers: { Authorization: env.BALLDONTLIE_API_KEY }
+    headers: { Authorization: env.BALLDONTLIE_API_KEY }, signal: AbortSignal.timeout(20000)
   });
   if (!response.ok) return null;
   const payload = await response.json();
@@ -615,17 +642,19 @@ async function getEspnNflFixtures(team, dateFrom, dateTo) {
   const rangeStart = new Date(`${dateFrom}T00:00:00Z`);
   const season = rangeStart.getUTCMonth() < 2 ? rangeStart.getUTCFullYear() - 1 : rangeStart.getUTCFullYear();
   const responses = await Promise.all([1, 2, 3].map(type => fetch(`https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/teams/${team.abbreviation.toLowerCase()}/schedule?season=${season}&seasontype=${type}`, {
-    headers: { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0 (compatible; MyFixtures/1.0)' }
+    headers: { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0 (compatible; MyFixtures/1.0)' }, signal: AbortSignal.timeout(20000)
   })));
   const payloads = await Promise.all(responses.filter(response => response.ok).map(response => response.json()));
   const events = payloads.flatMap(payload => payload.events || []);
-  return events
+  const games = events
     .filter((event, index, all) => all.findIndex(candidate => candidate.id === event.id) === index)
     .map(event => normalizeEspnNflGame(event, team.abbreviation))
     .filter(game => {
       const gameDate = game.utcDate.slice(0, 10);
       return gameDate >= dateFrom && gameDate <= dateTo;
     });
+  games.coverage = responses.every(response => response.ok) ? 'published' : 'partial';
+  return games;
 }
 
 async function getNflFixtures(url, env) {
@@ -640,7 +669,7 @@ async function getNflFixtures(url, env) {
   const dateFrom = url.searchParams.get('dateFrom') || '2026-08-01';
   const dateTo = url.searchParams.get('dateTo') || '2027-05-30';
   const espnGames = await getEspnNflFixtures(selectedTeam, dateFrom, dateTo);
-  if (espnGames.length) return new Response(JSON.stringify({ fixtures: espnGames, results: espnGames.length, provider: 'espn' }), { status: 200, headers: jsonHeaders });
+  if (espnGames.length) return new Response(JSON.stringify({ fixtures: espnGames, results: espnGames.length, provider: 'espn', coverage: espnGames.coverage }), { status: 200, headers: jsonHeaders });
   if (!env.BALLDONTLIE_API_KEY) return errorResponse('The ESPN NFL schedule is unavailable and BALLDONTLIE_API_KEY is not configured.');
 
   const seasonStartDate = new Date(`${dateFrom}T00:00:00Z`);
@@ -736,7 +765,8 @@ async function getMlbFixtures(url, env, options = {}) {
         id: `mlb-${game.id}`,
         sport: 'mlb',
         utcDate: game.date,
-        timeTbd: false,
+        timeTbd: !/T\d{2}:\d{2}/.test(game.date) || /tbd|tba|postpon|suspend|^ppd$/i.test(`${game.status || ''} ${game.status_state || ''}`),
+        scheduledDate: game.date.slice(0, 10),
         opponent: opponent.display_name || opponent.short_display_name || opponent.name || (isHome ? game.away_team_name : game.home_team_name) || 'Opponent TBC',
         venue: game.venue || '',
         competition: game.season_type === 'postseason' || game.postseason ? 'MLB Postseason' : 'MLB',
@@ -858,7 +888,7 @@ export class CalendarStore extends LivingCalendarStore {
         teamAbbreviation: team.abbreviation, competitions: team.competitions.join(','), dateFrom: range.from, dateTo: range.to });
       const loader = { soccer: getSoccerFixtures, nfl: getNflFixtures, nba: getNbaFixtures, nhl: getNhlFixtures, f1: getF1Fixtures, mlb: getMlbFixtures }[team.sport];
       const response = await loader(url, env, { history: true });
-      if (!response.ok) throw new Error('Schedule provider unavailable');
+      if (!response.ok) throw Object.assign(new Error('Schedule provider unavailable'), { status: response.status });
       const data = await response.json();
       if (!Array.isArray(data.fixtures) || Object.keys(data.errors || {}).length) throw new Error('Incomplete schedule response');
       // Soccer/NFL can supplement partial upstream feeds. Missing entries in

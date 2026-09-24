@@ -1,0 +1,29 @@
+.advanced-calendar { border: 1px solid var(--line); margin: 24px 0; padding: 14px; min-width: 0; }
+.advanced-calendar legend { font-size: 14px; font-weight: 600; padding: 0 6px; }
+.advanced-calendar input[type=date] { box-sizing: border-box; width: 100%; min-width: 0; }
+#competition-choices { max-height: 260px; overflow-y: auto; }
+#competition-choices label { font-size: 12px; overflow-wrap: anywhere; }
+#competition-choices input { flex: 0 0 16px; }
+.subscription-guide { border-top: 1px solid var(--line); padding-top: 14px; }
+.subscription-guide h3 { margin: 8px 0 14px; }
+.subscription-guide select { width: 100%; padding: 10px; }
+.subscription-guide ol { padding-left: 24px; font-size: 13px; line-height: 1.7; }
+.subscription-guide a, .week-card a { color: var(--ink); font-size: 12px; }
+.duplicate-choice { display: flex; align-items: center; gap: 8px; font: inherit; text-transform: none; letter-spacing: normal; margin: 20px 0 10px; }
+.duplicate-choice input { width: 16px; height: 16px; margin: 0; flex-shrink: 0; }
+.calendar-insights { margin: 14px 0; padding: 14px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.calendar-insights summary, .week-series summary { cursor: pointer; font-weight: 600; }
+#team-health { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.health-card, .change-card { padding: 14px; border: 1px solid var(--line); min-width: 0; overflow-wrap: anywhere; }
+.health-card h3, .change-card h3 { font-size: 14px; margin: 0 0 8px; }
+.health-card p, .change-card p { margin: 7px 0; line-height: 1.5; font-size: 12px; }
+.change-card { margin-top: 10px; }
+.change-card small { font-size: 11px; color: var(--muted); }
+.week-series { margin: 18px 0; border: 1px solid var(--line); padding: 16px; }
+.week-series summary span { display: block; font-size: 12px; color: var(--muted); font-weight: 400; margin-top: 6px; }
+.week-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.week-tabs button { border: 1px solid var(--line); background: var(--white); color: var(--ink); padding: 9px 12px; cursor: pointer; }
+.week-tabs [aria-selected=true] { background: var(--ink); color: white; }
+.week-tabs button:focus-visible, summary:focus-visible { outline: 2px solid var(--red); outline-offset: 3px; }
+.living-main [aria-disabled=true] { opacity: .5; pointer-events: none; }
+@media (max-width: 700px) { .week-series { padding: 12px; } #team-health { grid-template-columns: minmax(0,1fr); } }

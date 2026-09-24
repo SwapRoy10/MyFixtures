@@ -1,0 +1,34 @@
+name: Verify published schedules
+on:
+  schedule:
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Website to check
+        type: choice
+        default: development
+        options: [development, production]
+permissions:
+  contents: read
+concurrency:
+  group: published-schedule-audit
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: MyFixturesApp
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Test season boundaries and regression contracts
+        run: npm test
+      - name: Check published seasons without changing calendars
+        env:
+          SITE: ${{ (github.event_name == 'schedule' || inputs.target == 'production') && 'https://my-fixtures-api.sorp.workers.dev' || 'https://my-fixtures-api-development.sorp.workers.dev' }}
+        run: npm run audit:seasons -- "$SITE"

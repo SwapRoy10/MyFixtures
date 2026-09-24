@@ -1,6 +1,7 @@
 // Creates and then stops its own disposable subscription; never writes to a user's calendar.
 import assert from 'node:assert/strict';
 import { setTimeout as delay } from 'node:timers/promises';
+import { confirmedOpponent, matchesPreferences, competitionKey, localDate } from '../schedule-common.mjs';
 const base = process.argv.find(arg => /^https?:/.test(arg)) || 'http://localhost:8787';
 const teams = [{ sport: 'nhl', id: 4, name: 'Philadelphia Flyers', abbreviation: 'PHI' }, { sport: 'nhl', id: 8, name: 'Montréal Canadiens', abbreviation: 'MTL' }];
 if (process.argv.includes('--all-sports')) teams.push(
@@ -29,6 +30,11 @@ try {
   }
   assert.equal(state.ready, true, `Schedules failed to finish: ${state.pending.join(', ')}`);
   assert.ok(state.games.length > 0);
+  for (const sport of new Set(teams.map(t => t.sport))) assert.ok(state.games.some(g => g.sport === sport), `No games returned for ${sport}`);
+  assert.equal(state.health.length, teams.length);
+  assert.ok(state.health.every(h => h.checkedAt && h.updated && h.season.from));
+  assert.ok(Array.isArray(state.changes));
+  assert.ok(state.competitions.length > 0);
   assert.ok(state.games.some(g => g.selectedTeams.length === 2), 'Both selected NHL opponents should share an event');
   assert.equal(state.editToken, undefined);
   assert.equal(state.tokenHash, undefined);
@@ -36,7 +42,7 @@ try {
   assert.equal(response.status, 200);
   assert.match(response.headers.get('content-type'), /text\/calendar/);
   const ics = (await response.text()).replace(/\r\n /g, '');
-  const expected = state.games.filter(g => !g.timeTbd && !/cancel|abandon|postpon|suspend|^ppd$/i.test(g.status || '')).length;
+  const expected = state.games.filter(g => !g.timeTbd && confirmedOpponent(g) && !/cancel|abandon|postpon|suspend|^ppd$/i.test(g.status || '')).length;
   assert.equal((ics.match(/BEGIN:VEVENT/g) || []).length, expected);
   const uids = ics.match(/^UID:.+$/gm).sort();
   assert.equal(new Set(uids).size, expected);
@@ -51,7 +57,21 @@ try {
   assert.match(updated, /TRIGGER:-PT60M/);
   assert.match(updated, /SEQUENCE:1/);
   assert.equal((await request(path, 'PUT', { ...settings, revision: state.revision }, owner.editToken)).status, 409);
-  console.log(JSON.stringify({ target: base, teams: teams.length, sports: [...new Set(state.games.map(g => g.sport))], games: state.games.length, feedEvents: expected, doubleCountedGames: 0, httpCaching: 'passed', ownerAuthorization: 'passed', sameLinkUpdates: 'passed' }, null, 2));
+  const sample = state.games.find(g => g.sport === 'nhl' && !g.timeTbd && confirmedOpponent(g));
+  const date = localDate(sample.utcDate, settings.timeZone);
+  const filters = { ...settings, reminder: 60, venueFilter: sample.selectedSides[0], dateFrom: date, dateTo: date, competitionFilters: [competitionKey(sample)], revision: state.revision + 1 };
+  await json(await request(path, 'PUT', filters, owner.editToken));
+  const filtered = await json(await request(path));
+  assert.ok(filtered.games.length > 0);
+  assert.ok(filtered.games.every(g => matchesPreferences(g, filters)));
+  const filteredFeed = await (await request(feed)).text();
+  assert.equal((filteredFeed.match(/STATUS:CONFIRMED/g) || []).length, filtered.games.filter(g => !g.timeTbd && confirmedOpponent(g) && !/cancel|postpon|suspend/i.test(g.status || '')).length);
+  assert.match(filteredFeed, /STATUS:CANCELLED/, 'Excluded games are withdrawn from existing subscribers');
+  await json(await request(path, 'PUT', { ...settings, reminder: 60, revision: filtered.revision }, owner.editToken));
+  const restored = (await (await request(feed)).text()).replace(/\r\n /g, '');
+  assert.deepEqual(restored.match(/^UID:.+$/gm).sort(), uids);
+  assert.equal((restored.match(/STATUS:CONFIRMED/g) || []).length, expected);
+  console.log(JSON.stringify({ target: base, teams: teams.length, sports: [...new Set(state.games.map(g => g.sport))], games: state.games.length, feedEvents: expected, doubleCountedGames: 0, httpCaching: 'passed', ownerAuthorization: 'passed', sameLinkUpdates: 'passed', advancedFilters: 'passed', filterWithdrawalAndRestore: 'passed', perTeamHealth: 'passed' }, null, 2));
   passed = true;
 } finally {
   await json(await request(path, 'DELETE', undefined, owner.editToken));

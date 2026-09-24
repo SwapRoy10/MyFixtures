@@ -9,6 +9,11 @@ MyFixtures is a responsive sports schedule website for following soccer clubs, N
 
 ## Features
 
+- Check per-team schedule freshness and coverage, with dated last-good schedules during provider outages.
+- Review recent schedule changes: times, venues, postponements and newly published matchups.
+- Filter a Living Calendar by home/away, competitions and inclusive local dates; the dashboard and subscribed feed use the same settings.
+- Follow device-specific subscription instructions with duplicate-import warnings.
+- Browse MLB series with expandable game tabs in My Week while retaining individual calendar events.
 - Combine up to 12 teams across sports in a persistent Living Calendar subscription.
 - See a combined My Week agenda with Today, Weekend, Full season, sport and postseason filters, plus estimated game overlaps.
 - Keep subscribed events updated as confirmed times, venues and matchups change; edit selections and reminders without replacing the subscription link.
@@ -82,6 +87,8 @@ npm run audit:living -- http://localhost:8787
 
 The Living Calendar audit creates and stops its own disposable NHL subscription. Add `--all-sports` to check all six sports against a configured development Worker. It may take several minutes while initial schedules load. It never writes to a user's Google, Apple or Outlook calendar.
 
+Run `npm run audit:seasons -- https://my-fixtures-api-development.sorp.workers.dev` for a paced, read-only check of current published seasons across all six sports. Regression tests cover January and July rollovers. The **Verify published schedules** workflow provides manual checks and a daily production check once merged into the default branch; it cannot verify unpublished matchups.
+
 ## Living Calendar
 
 Open **My Week & Living Calendar**, select your teams, and create your calendar. Once schedules finish preparing, subscribe using the provided URL in Google Calendar (Settings → Add calendar → From URL), Apple Calendar or Outlook. Importing a downloaded file once is not a subscription.
@@ -91,6 +98,14 @@ Save the private management link to edit your selection on another device. The s
 Schedules refresh approximately hourly in the background. Calendar applications control their own polling and may take several hours to display changes. Unconfirmed times are excluded from the feed until confirmed. Overlap detection uses estimated game lengths; reminder support depends on the calendar application. Only published matchups are available, including postseason games as providers announce them.
 
 The Worker uses the `CALENDARS` SQLite Durable Object binding and migration in `wrangler.toml`. Development and production have separate subscription data and URLs. Ordinary one-off exports remain available and unchanged.
+
+### Reliability, history and filters
+
+Coverage describes the provider response, not a guarantee that future fixtures have been announced. Cached checks may reuse an upstream response. When an update fails, the dashboard retains its last successful schedule and labels it stale. One-off schedule pages use a best-effort seven-day edge/browser snapshot; cache eviction or disabled browser storage can make that snapshot unavailable.
+
+History begins with the first successful baseline and retains up to 80 changes per team for 90 days. Editing calendar settings does not create schedule-change entries. Unknown opponents and unconfirmed or postponed start times are not exported as confirmed events.
+
+Home/away filters match any selected participating team; neutral-site games are excluded from either side-only filter. Date bounds use the calendar's selected time zone. All competitions includes newly announced competitions automatically; an explicit selection does not. Excluded events are withdrawn using their existing identifiers, so restoring filters restores the same events rather than creating duplicates.
 
 ## Deployment
 

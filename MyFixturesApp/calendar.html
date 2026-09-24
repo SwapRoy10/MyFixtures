@@ -7,6 +7,7 @@
   <title>MyFixtures | Living Calendar</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="calendar.css">
+  <link rel="stylesheet" href="calendar-updates.css">
 </head>
 <body>
   <main class="shell living-shell">
@@ -26,6 +27,15 @@
           <label for="calendar-name">Calendar name</label><input id="calendar-name" maxlength="80" required value="MyFixtures Living Calendar">
           <label for="living-timezone">Time zone</label><select id="living-timezone"><option value="America/New_York">Eastern Time</option><option value="America/Chicago">Central Time</option><option value="America/Denver">Mountain Time</option><option value="America/Los_Angeles">Pacific Time</option><option value="Europe/London">British Time</option><option value="Europe/Paris">Central European Time</option><option value="Asia/Kolkata">India Time</option><option value="Asia/Tokyo">Japan Time</option><option value="Australia/Sydney">Sydney Time</option></select>
           <div class="calendar-checks"><label><input type="checkbox" id="include-completed"> Include completed games</label><label><input type="checkbox" id="include-preseason" checked> Include preseason</label><label><input type="checkbox" id="include-postseason" checked> Include postseason</label></div>
+          <fieldset class="advanced-calendar"><legend>Which games should appear?</legend>
+            <label for="venue-filter">Home or away</label><select id="venue-filter"><option value="all">All games</option><option value="home">Home games only</option><option value="away">Away games only</option></select>
+            <p class="field-note">Relative to any selected team. Neutral-site games are excluded from home/away-only views; Formula 1 is unaffected.</p>
+            <label for="calendar-date-from">From date (optional)</label><input id="calendar-date-from" type="date">
+            <label for="calendar-date-to">Through date (optional)</label><input id="calendar-date-to" type="date">
+            <p class="field-note">Dates use your selected time zone. Leave blank to follow each current season automatically.</p>
+            <label for="competition-mode">Competitions</label><select id="competition-mode"><option value="all">All competitions, including new ones</option><option value="selected">Only selected competitions</option></select>
+            <div id="competition-choices" class="calendar-checks" hidden></div><p id="competition-note" class="field-note">Competition choices appear after schedules load.</p>
+          </fieldset>
           <label for="calendar-reminder">Reminder before each game</label><select id="calendar-reminder"><option value="0">No reminder</option><option value="15">15 minutes</option><option value="30" selected>30 minutes</option><option value="60">1 hour</option><option value="1440">1 day</option></select>
           <p class="field-note">Your calendar app may use its own notification settings.</p>
           <button id="save-calendar" class="button button-solid" type="submit">Create my calendar</button>
@@ -40,6 +50,13 @@
           <label for="feed-url">Calendar subscription URL</label><input id="feed-url" readonly>
           <p id="feed-readiness" role="status"></p>
           <div class="subscription-actions"><button id="copy-feed" class="button button-solid" type="button">Copy calendar link</button><a id="webcal-link" class="button button-outline" href="#">Open calendar app</a><a id="google-subscribe" class="button button-outline" href="https://calendar.google.com/calendar/u/0/r/settings/addbyurl" target="_blank" rel="noreferrer">Google Calendar</a></div>
+          <section class="subscription-guide" aria-labelledby="guide-title"><h3 id="guide-title">Subscribe for updates</h3>
+            <label for="calendar-app">Your calendar app / device</label><select id="calendar-app"><option value="google">Google Calendar — computer</option><option value="google-mobile">Google Calendar — Android / iPhone</option><option value="iphone">Apple Calendar — iPhone / iPad</option><option value="mac">Apple Calendar — Mac</option><option value="outlook">Outlook — web / new Outlook</option></select>
+            <div id="subscription-instructions"></div>
+            <label class="duplicate-choice"><input id="imported-before" type="checkbox"> I already imported or added these games</label>
+            <p id="duplicate-help" class="field-note" hidden>Do not import again. If the old games live in a dedicated MyFixtures calendar, hide it first to compare, then remove only that old calendar when you are ready. If you added games individually to your personal calendar, remove only those sports entries you recognize. This subscription cannot update or remove previous copies.</p>
+            <details><summary>Prefer a one-time download?</summary><p>This is a snapshot, not an updating subscription. Importing it again can create duplicates.</p><a id="download-once" class="button button-outline" download="myfixtures-snapshot.ics">Download once (.ics)</a></details>
+          </section>
           <details><summary>How to subscribe</summary><p>Google Calendar: on the desktop website, open Settings → Add calendar → From URL and paste the link above. Apple Calendar: choose New Calendar Subscription. Outlook: choose Add calendar → Subscribe from web.</p><p>We refresh team schedules about hourly. Your calendar app controls when it checks the subscription, so updates may take several hours. Unconfirmed times appear below but are excluded from the feed until confirmed. Previously exported entries are withdrawn if their time becomes unconfirmed.</p><p>If you previously imported these games, remove that old import to avoid duplicates. This subscription cannot edit events from an earlier import.</p></details>
           <details id="manage-details"><summary>Manage or share this calendar</summary><label for="manage-url">Private management link — keep this to edit on another device</label><input id="manage-url" readonly><button id="copy-manage" class="text-button" type="button">Copy private management link</button><label for="share-url">View-only dashboard link</label><input id="share-url" readonly><button id="copy-share" class="text-button" type="button">Copy dashboard link</button><p>Anyone with the subscription or dashboard link can view your selected teams and schedule. Only the private management link can change your settings.</p></details>
           <p id="copy-message" role="status"></p>
@@ -47,12 +64,14 @@
         <div class="week-heading"><div><p class="eyebrow">Your sports agenda</p><h2 id="week-title">My Week</h2></div><button id="refresh-calendar" class="text-button" type="button" hidden>Refresh view</button></div>
         <div class="week-filters"><label>Show<select id="week-period"><option value="week">This week</option><option value="today">Today</option><option value="weekend">This weekend</option><option value="season">Full season</option></select></label><label>Sport<select id="week-sport"><option value="all">All sports</option><option value="soccer">Soccer</option><option value="nfl">NFL</option><option value="mlb">MLB</option><option value="nba">NBA</option><option value="nhl">NHL</option><option value="f1">Formula 1</option></select></label><label class="postseason-filter"><input id="week-postseason" type="checkbox"> Postseason only</label></div>
         <p id="schedule-status" role="status" aria-live="polite">Choose your teams, then create a calendar to see their combined schedule.</p>
+        <details id="health-details" class="calendar-insights"><summary>Schedule reliability — each team</summary><p class="field-note">A loaded feed contains currently published games, not a guarantee that every future matchup is determined. Checks may reuse provider data cached for up to an hour.</p><div id="team-health"></div></details>
+        <details id="changes-details" class="calendar-insights"><summary>What changed? <span id="changes-count"></span></summary><p class="field-note">Provider changes recorded after this calendar was created, across your selected teams (including games hidden by filters). History starts after a baseline refresh and keeps up to 80 recent changes from the last 90 days. Changes to your settings are not fixture changes.</p><div id="schedule-changes"></div></details>
         <p id="overlap-note" class="field-note" hidden>Overlaps use estimated game durations; actual finishing times can vary.</p>
         <div id="week-games"></div>
       </section>
     </div>
     <footer><span>MyFixtures</span><span>Built for matchday people</span></footer>
   </main>
-  <script type="module" src="calendar-ui.mjs?v=20260923-living-1"></script>
+  <script type="module" src="calendar-ui.mjs?v=20260924-reliability-2"></script>
 </body>
 </html>

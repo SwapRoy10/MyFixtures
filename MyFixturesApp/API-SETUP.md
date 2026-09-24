@@ -1,5 +1,15 @@
 # Live schedule API setup
 
+## Schedule reliability updates
+
+Fixture responses include `health` freshness and coverage metadata. Last-good edge snapshots are retained best-effort for seven days; stale results are explicitly labeled and are not cached as new successes. The browser also retains a dated last-good snapshot. Partial responses never replace a complete snapshot.
+
+Living Calendar settings accept `venueFilter` (`all`, `home`, `away`), inclusive local `dateFrom`/`dateTo`, and an optional `competitionFilters` allowlist. Existing calendars default to all games. Dashboard and ICS filtering share the same rules; removed events retain their UID as cancellations and restored events reuse that UID.
+
+Per-team provider-change history starts at the first baseline and keeps at most 80 records for 90 days. Large schedule snapshots are stored in bounded chunks, with legacy records read transparently. No additional secrets or Durable Object migration are required.
+
+Run `npm test` and `npm run audit:living -- URL --all-sports` for regression and disposable-subscription integration checks. Run `npm run audit:seasons -- URL` for a paced, read-only current-season audit. The scheduled verification workflow becomes active after promotion to the repository's default branch.
+
 ## Living Calendar and My Week
 
 `/calendar.html` combines up to 12 selections across all six sports. Create a subscription, wait for its initial schedules to finish, then subscribe to `/calendar/ID.ics`. Google Calendar's desktop **Add calendar → From URL** accepts the HTTPS URL; Apple Calendar and Outlook can also subscribe. No Google OAuth access is needed for this feature. Existing one-off exports and Google bulk sync remain separate.
