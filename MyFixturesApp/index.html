@@ -51,13 +51,13 @@
       .series-heading { flex-wrap: wrap; gap: 12px; }
     }
   </style>
-  <link rel="stylesheet" href="theme.css?v=20260929-stitch-source">
+  <link rel="stylesheet" href="theme.css?v=20260929-shared-slate">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
 </head>
 <body>
   <main class="shell">
     <header class="topbar">
-      <div class="brand-group"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">MF</span>MyFixtures<span class="brand-edition">Edition</span></a><select class="sport-select" id="sport-select" aria-label="Choose sport"><option value="soccer">Soccer</option><option value="nfl">NFL</option><option value="mlb">MLB</option><option value="nba">NBA</option><option value="nhl">NHL</option><option value="f1">Formula 1</option></select></div>
+      <div class="brand-group"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">MF</span>MyFixtures<span class="brand-edition">Edition</span></a><div class="sport-menu-wrap"><select class="sport-select" id="sport-select" aria-label="Choose sport" tabindex="-1" aria-hidden="true"><option value="soccer">Soccer</option><option value="nfl">NFL</option><option value="mlb">MLB</option><option value="nba">NBA</option><option value="nhl">NHL</option><option value="f1">Formula 1</option></select><button id="sport-menu-button" class="sport-menu-button" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="sport-menu"><span class="sport-menu-prefix">Sport:</span><span id="sport-menu-label">Soccer</span><span class="sport-menu-chevron" aria-hidden="true">⌄</span></button><div id="sport-menu" class="sport-menu" role="listbox" aria-label="Choose sport" inert><button type="button" role="option" data-sport-value="soccer">Soccer</button><button type="button" role="option" data-sport-value="nfl">NFL</button><button type="button" role="option" data-sport-value="mlb">MLB</button><button type="button" role="option" data-sport-value="nba">NBA</button><button type="button" role="option" data-sport-value="nhl">NHL</button><button type="button" role="option" data-sport-value="f1">Formula 1</button></div></div></div>
       <nav class="topbar-links" aria-label="Main navigation"><a class="active" href="/" aria-current="page">Fixtures</a><a href="/calendar.html">My Week</a></nav>
       <div class="topbar-meta"><span class="live-dot"></span><span>Current season</span><span class="divider"></span><select id="timezone-select" aria-label="Choose time zone"><option value="America/New_York">Eastern Time</option><option value="America/Chicago">Central Time</option><option value="America/Denver">Mountain Time</option><option value="America/Los_Angeles">Pacific Time</option><option value="Europe/London">British Time</option></select></div>
     </header>
@@ -86,7 +86,7 @@
     </section>
 
     <section class="mlb-subscription" aria-labelledby="mlb-subscription-title"><div><p class="eyebrow">Living subscription</p><h2 id="mlb-subscription-title">One subscription. Zero manual entry.</h2><p>Follow schedule changes through a calendar feed, including newly confirmed postseason games. Your calendar app controls when it refreshes.</p></div><a class="button button-solid" href="/calendar.html#settings-title">Build a living calendar ↗</a></section>
-    <section class="mlb-week" aria-labelledby="mlb-week-title"><div class="mlb-week-heading"><div><p class="eyebrow">Seven-day slate</p><h2 id="mlb-week-title">This week’s games</h2></div><a href="/calendar.html#week-title">Open My Week ↗</a></div><div id="mlb-week-grid"></div></section>
+    <section class="seven-day-slate" aria-labelledby="slate-title"><div class="slate-heading"><div><p class="eyebrow">Seven-day slate</p><h2 id="slate-title">Next seven days</h2><p id="slate-source" class="slate-source" role="status">Showing the selected team</p></div><a href="/calendar.html#week-title">Open My Week ↗</a></div><div id="slate-grid" class="slate-grid"></div></section>
 
     <section class="fixture-section">
       <div class="section-heading"><div><p class="eyebrow">Current season</p><h2>Every team. <span>Every match.</span></h2></div><p class="timezone" id="timezone-label">Times shown in Eastern Time</p></div>
@@ -125,6 +125,6 @@
     </form>
   </dialog>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="app.js?v=20260929-stitch-source"></script>
+  <script src="app.js?v=20260929-shared-slate"></script>
 </body>
 </html>

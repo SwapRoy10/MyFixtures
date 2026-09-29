@@ -3,6 +3,7 @@ import { confirmedOpponent, localDate } from './schedule-common.mjs';
 import { calendarGuides } from './calendar-guides.mjs';
 
 const $ = id => document.getElementById(id);
+const replayEntrance = element => { if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return; element.classList.remove('content-enter'); void element.offsetWidth; element.classList.add('content-enter'); };
 const escape = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const key = team => `${team.sport || 'soccer'}:${team.id}`;
 const stored = name => { try { return JSON.parse(localStorage.getItem(name) || 'null'); } catch { return null; } };
@@ -147,11 +148,19 @@ function renderDashboard() {
   $('week-team-filters').innerHTML = `<button type="button" data-week-team="all" aria-pressed="${activeWeekTeam === 'all'}">All teams (${periodGames.length})</button>${followedTeams.map(team => `<button type="button" data-week-team="${escape(key(team))}" aria-pressed="${activeWeekTeam === key(team)}">${escape(team.name)}</button>`).join('')}`;
   $('week-team-filters').querySelectorAll('[data-week-team]').forEach(button => button.addEventListener('click', () => { activeWeekTeam = button.dataset.weekTeam; renderDashboard(); }));
   const today = localDate(new Date().toISOString(), timeZone);
+  const previousSlate = $('week-strip').innerHTML;
   $('week-strip').innerHTML = Array.from({ length: 7 }, (_, index) => {
     const date = new Date(`${today}T12:00:00Z`); date.setUTCDate(date.getUTCDate() + index);
     const day = date.toISOString().slice(0, 10);
-    const count = outlookGames.filter(game => gameDate(game, timeZone) === day).length;
-    return `<div class="week-day${index === 0 ? ' today' : ''}" aria-label="${escape(day)}: ${count} ${count === 1 ? 'game' : 'games'}"><small>${new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'short' }).format(date)}</small><strong>${date.getUTCDate()}</strong><span>${count ? `${count} ${count === 1 ? 'game' : 'games'}` : 'Rest day'}</span></div>`;
+    const dayGames = outlookGames.filter(game => gameDate(game, timeZone) === day).sort((first, second) => Number(Boolean(first.timeTbd)) - Number(Boolean(second.timeTbd)) || Date.parse(first.utcDate) - Date.parse(second.utcDate));
+    const label = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'short' }).format(date);
+    const cards = dayGames.map(game => {
+      const cancelled = /cancel|abandon|^cncl$/i.test(game.status || '');
+      const pending = game.timeTbd || /postpon|suspend|^ppd$/i.test(game.status || '');
+      const kickoff = cancelled ? 'Canceled' : pending ? 'TBD' : new Intl.DateTimeFormat('en-US', { timeZone, hour: 'numeric', minute: '2-digit' }).format(new Date(game.utcDate));
+      return `<div class="slate-game"><small>${escape(game.sport.toUpperCase())}</small><strong>${escape(game.title)}</strong><span>${escape(kickoff)}</span></div>`;
+    }).join('');
+    return `<div class="slate-day${index === 0 ? ' today' : ''}" aria-label="${escape(day)}: ${dayGames.length} ${dayGames.length === 1 ? 'game' : 'games'}"><div class="slate-date"><strong>${label} ${date.getUTCDate()}</strong><span>${dayGames.length ? `${dayGames.length} ${dayGames.length === 1 ? 'game' : 'games'}` : 'Rest'}</span></div>${cards || '<span class="slate-rest">No games</span>'}</div>`;
   }).join('');
   const conflicts = conflictKeys(games);
   const formatter = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', month: 'short', day: 'numeric', weekday: 'short' });
@@ -166,6 +175,7 @@ function renderDashboard() {
   };
   const visible = new Set(games.map(g => g.key));
   const groups = groupWeekSeries(state.games || []).map(group => ({ ...group, shown: group.games.map((game, index) => ({ game, number: index + 1 })).filter(({ game }) => visible.has(game.key)) })).filter(g => g.shown.length);
+  const previousAgenda = $('week-games').innerHTML;
   $('week-games').innerHTML = groups.length ? groups.map((group, index) => {
     if (group.games.length === 1) return card(group.shown[0].game);
     const active = group.shown.some(g => g.game.key === activeGames.get(group.key)) ? activeGames.get(group.key) : group.shown[0].game.key;
@@ -173,6 +183,8 @@ function renderDashboard() {
     const panels = group.shown.map(({ game, number }) => `<div role="tabpanel" id="week-${index}-${number}-panel" aria-labelledby="week-${index}-${number}-tab" ${game.key === active ? '' : 'hidden'}>${card(game)}</div>`).join('');
     return `<details class="week-series" data-series-key="${escape(group.key)}" ${openSeries.has(group.key) ? 'open' : ''}><summary>${escape(group.games[0].title)} <span>${group.shown.length} of ${group.games.length} games in this view</span></summary><p class="field-note">MLB series inferred from consecutive published matchups. Game numbers refer to the currently loaded series; calendar entries remain individual games.</p><div class="week-tabs" role="tablist" aria-label="Games in ${escape(group.games[0].title)}">${tabs}</div>${panels}</details>`;
   }).join('') : '<div class="empty-week">No games match this view. Try Full season or adjust your saved calendar filters.</div>';
+  if (previousSlate !== $('week-strip').innerHTML) replayEntrance($('week-strip'));
+  if (previousAgenda !== $('week-games').innerHTML) replayEntrance($('week-games'));
   $('week-games').querySelectorAll('.week-series').forEach(series => {
     series.addEventListener('toggle', () => { if (series.open) openSeries.add(series.dataset.seriesKey); else openSeries.delete(series.dataset.seriesKey); });
     const tabs = [...series.querySelectorAll('[role="tab"]')];

@@ -1,5 +1,7 @@
 const fixtures = [];
 let activeFixtureFilter = 'all';
+let followedSlate = null;
+let followedSlateState = 'selected';
 const appRelease = '20260924-reliability-2';
 const scheduleSnapshots = new Map();
 const f1Selection = { id: 'f1', sport: 'f1', name: 'Formula 1', abbreviation: 'F1', crest: 'https://city-png.b-cdn.net/thumbnail/thumbnail_public/uploads/preview/hd-f1-the-official-formula-1-transparent-png-701751712229525ajvwddtfme.png?v=2025092211' };
@@ -25,6 +27,8 @@ const savedClubs = document.querySelector('#saved-clubs');
 const clubSearchInput = document.querySelector('#club-search-input');
 const googleAllButton = document.querySelector('#google-all');
 const sportSelect = document.querySelector('#sport-select');
+const sportMenuButton = document.querySelector('#sport-menu-button');
+const sportMenu = document.querySelector('#sport-menu');
 const teamMarkWrapper = document.querySelector('#team-mark-wrapper');
 const googleClientId = '182131305802-0i417v1pr1tarbne0gofgqcvr2oqolfb.apps.googleusercontent.com';
 const calendarScope = 'https://www.googleapis.com/auth/calendar.events';
@@ -76,6 +80,8 @@ function setTeamHeader() {
   document.querySelector('.topbar-meta > span:nth-child(2)').textContent = isF1 || isMlb ? 'Season ' + new Date().getUTCFullYear() : `Season ${season.label}`;
   document.querySelector('#pulse-season').textContent = isF1 || isMlb ? String(new Date().getUTCFullYear()) : `${season.startYear}/${String(season.endYear).slice(-2)}`;
   document.querySelector('#mobile-team-season').textContent = `${sportLabel()} · ${isF1 || isMlb ? new Date().getUTCFullYear() : season.label}`;
+  document.querySelector('#sport-menu-label').textContent = sportLabel();
+  document.querySelectorAll('[data-sport-value]').forEach(button => button.setAttribute('aria-selected', String(button.dataset.sportValue === currentSport)));
   document.querySelector('#mobile-add').hidden = isF1;
   document.querySelector('.section-heading .eyebrow').textContent = isF1 ? new Date().getUTCFullYear() + ' Formula 1 season' : isMlb ? `${new Date().getUTCFullYear()} MLB season - today forward` : isNba || isNhl ? `${season.startYear}-${String(season.endYear).slice(-2)} ${sportLabel()} season` : `${season.label} season - July through June`;
   document.querySelector('.section-heading h2').textContent = isF1 ? 'Every Grand Prix.' : isMlb ? 'Every series. Every game.' : isNba || isNhl ? 'Every team. Every game.' : 'Every team. Every match.';
@@ -163,18 +169,60 @@ function matchesFixtureFilter(fixture, filter = activeFixtureFilter) {
   if (filter === 'home') return currentSport !== 'f1' && fixture.home && !fixture.neutralSite;
   return true;
 }
-function renderMlbWeek() {
-  const grid = document.querySelector('#mlb-week-grid');
-  if (currentSport !== 'mlb') { grid.innerHTML = ''; return; }
+function renderSevenDaySlate() {
+  const grid = document.querySelector('#slate-grid');
+  const source = document.querySelector('#slate-source');
+  const combined = Boolean(followedSlate);
+  source.textContent = followedSlateState === 'stale' ? 'My Week update delayed · showing the last saved slate' : combined && followedSlateState === 'preparing' ? 'My Week is preparing · some followed schedules may still be loading' : combined ? `All ${followedSlate.teamCount} followed ${followedSlate.teamCount === 1 ? 'team' : 'teams'} in My Week` : followedSlateState === 'loading' ? `Loading My Week · showing ${currentTeam.name} for now` : `Showing ${currentTeam.name} · create My Week to combine teams`;
   const today = selectedZoneDateKey();
   grid.innerHTML = Array.from({ length: 7 }, (_, index) => {
     const day = new Date(`${today}T12:00:00Z`);
     day.setUTCDate(day.getUTCDate() + index);
     const key = day.toISOString().slice(0, 10);
-    const games = fixtures.filter(fixture => fixtureDateKey(fixture) === key);
+    const games = combined
+      ? followedSlate.games.filter(game => (game.timeTbd && game.scheduledDate ? game.scheduledDate : selectedZoneDateKey(game.utcDate)) === key)
+      : fixtures.filter(fixture => fixtureDateKey(fixture) === key);
+    games.sort((first, second) => Number(Boolean(first.timeTbd)) - Number(Boolean(second.timeTbd)) || Date.parse(first.utcDate || `${first.date}T12:00:00Z`) - Date.parse(second.utcDate || `${second.date}T12:00:00Z`));
     const label = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'short' }).format(day);
-    return `<div class="mlb-week-day${index === 0 ? ' today' : ''}"><div class="mlb-week-date"><strong>${label} ${day.getUTCDate()}</strong><span>${games.length ? `${games.length} ${games.length === 1 ? 'game' : 'games'}` : 'Rest'}</span></div>${games.slice(0, 2).map(game => `<div class="mlb-week-game"><strong>${escapeHtml(game.home ? 'vs ' + game.opponent : '@ ' + game.opponent)}</strong><span>${game.timeTbd ? 'TBD' : escapeHtml(fixtureDisplay(game).time)}</span></div>`).join('')}${games.length > 2 ? `<small>+${games.length - 2} more</small>` : ''}</div>`;
+    const cards = games.map(game => {
+      const title = combined ? game.title : currentSport === 'f1' ? fixtureTitle(game) : `${game.home ? 'vs' : '@'} ${game.opponent}`;
+      const cancelled = /cancel|abandon|^cncl$/i.test(game.status || '');
+      const pending = game.timeTbd || /postpon|suspend|^ppd$/i.test(game.status || '');
+      const time = cancelled ? 'Canceled' : pending ? 'TBD' : combined ? new Intl.DateTimeFormat('en-US', { timeZone: selectedTimeZone, hour: 'numeric', minute: '2-digit' }).format(new Date(game.utcDate)) : fixtureDisplay(game).time;
+      return `<div class="slate-game"><small>${escapeHtml(combined ? game.sport.toUpperCase() : sportLabel().toUpperCase())}</small><strong>${escapeHtml(title)}</strong><span>${escapeHtml(time)}</span></div>`;
+    }).join('');
+    return `<div class="slate-day${index === 0 ? ' today' : ''}"><div class="slate-date"><strong>${label} ${day.getUTCDate()}</strong><span>${games.length ? `${games.length} ${games.length === 1 ? 'game' : 'games'}` : 'Rest'}</span></div>${cards || '<span class="slate-rest">No games</span>'}</div>`;
   }).join('');
+  replayEntrance(grid);
+}
+function replayEntrance(element, className = 'content-enter') {
+  if (!element?.classList || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  element.classList.remove(className);
+  void element.offsetWidth;
+  element.classList.add(className);
+}
+async function loadFollowedSlate() {
+  let id;
+  try { id = JSON.parse(localStorage.getItem('living-calendar-owner') || 'null')?.id; } catch { return; }
+  if (!/^[a-f0-9]{32}$/.test(id || '')) return;
+  followedSlateState = 'loading';
+  renderSevenDaySlate();
+  try {
+    const response = await fetch(`/api/calendars/${id}`, { signal: globalThis.AbortSignal?.timeout(25000) });
+    if (!response.ok) throw new Error(`My Week returned ${response.status}`);
+    const data = await response.json();
+    if (data.revoked || !Array.isArray(data.games)) throw new Error('My Week is unavailable');
+    followedSlate = { games: data.games, teamCount: data.config?.teams?.length || 0 };
+    followedSlateState = data.ready ? 'current' : 'preparing';
+    try { localStorage.setItem(`myweek-slate:${id}`, JSON.stringify({ ...followedSlate, savedAt: Date.now() })); } catch { /* The live slate still works without browser storage. */ }
+  } catch {
+    try {
+      const saved = JSON.parse(localStorage.getItem(`myweek-slate:${id}`) || 'null');
+      if (Array.isArray(saved?.games)) { followedSlate = saved; followedSlateState = 'stale'; }
+      else followedSlateState = 'selected';
+    } catch { followedSlateState = 'selected'; }
+  }
+  renderSevenDaySlate();
 }
 function mlbGamePanel(entry, seriesIndex, gameIndex) {
   const { fixture, index } = entry;
@@ -225,7 +273,7 @@ function activateSeriesTab(tab) {
   card.querySelectorAll('[role="tabpanel"]').forEach(panel => { panel.hidden = panel.id !== tab.getAttribute('aria-controls'); });
 }
 function render() {
-  renderMlbWeek();
+  renderSevenDaySlate();
   const orderedFixtures = fixtures.filter(fixture => matchesFixtureFilter(fixture)).sort((first, second) => (first.utcDate || first.date).localeCompare(second.utcDate || second.date));
   for (const filter of ['all', 'week', 'upcoming', 'played', 'home']) {
     document.querySelector(`#filter-${filter}-count`).textContent = String(fixtures.filter(fixture => matchesFixtureFilter(fixture, filter)).length);
@@ -263,6 +311,7 @@ function render() {
     ? `Next confirmed: ${currentSport === 'f1' ? fixtureTitle(next) : next.opponent} · ${new Intl.DateTimeFormat('en-US', { timeZone: selectedTimeZone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(fixtureSortTime(next)))}`
     : 'No confirmed upcoming start is currently published.';
   document.querySelectorAll('.fixture-add[data-index]').forEach(button => button.addEventListener('click', () => openGoogleCalendar(orderedFixtures[button.dataset.index])));
+  replayEntrance(list);
 }
 function formatFixtureForSelectedZone(timestamp) {
   const date = new Date(timestamp);
@@ -474,6 +523,24 @@ document.querySelector('#close-dialog').addEventListener('click', () => document
 document.querySelector('#club-select').addEventListener('click', () => { renderSavedClubs(); clubDialog.showModal(); clubSearchInput.focus(); });
 document.querySelector('#close-club-dialog').addEventListener('click', () => clubDialog.close());
 document.querySelector('#club-search-form').addEventListener('submit', searchTeams);
+if (sportMenuButton?.classList && sportMenu?.classList) {
+  const setMenuOpen = open => { sportMenu.classList.toggle('open', open); sportMenu.inert = !open; sportMenuButton.setAttribute('aria-expanded', String(open)); };
+  sportMenuButton.addEventListener('click', () => setMenuOpen(!sportMenu.classList.contains('open')));
+  sportMenuButton.addEventListener('keydown', event => { if (event.key === 'ArrowDown') { event.preventDefault(); setMenuOpen(true); sportMenu.querySelector('[aria-selected="true"]')?.focus(); } });
+  sportMenu.addEventListener('keydown', event => {
+    const options = [...sportMenu.querySelectorAll('[data-sport-value]')];
+    const index = options.indexOf(document.activeElement);
+    const target = event.key === 'ArrowDown' ? options[(index + 1) % options.length] : event.key === 'ArrowUp' ? options[(index - 1 + options.length) % options.length] : event.key === 'Home' ? options[0] : event.key === 'End' ? options.at(-1) : null;
+    if (target) { event.preventDefault(); target.focus(); }
+  });
+  sportMenu.querySelectorAll('[data-sport-value]').forEach(button => button.addEventListener('click', () => {
+    setMenuOpen(false);
+    sportMenuButton.focus();
+    if (sportSelect.value !== button.dataset.sportValue) { sportSelect.value = button.dataset.sportValue; sportSelect.dispatchEvent(new Event('change', { bubbles: true })); }
+  }));
+  document.addEventListener('click', event => { if (!sportMenuButton.parentElement.contains(event.target)) setMenuOpen(false); });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape' && sportMenu.classList.contains('open')) { setMenuOpen(false); sportMenuButton.focus(); } });
+}
 sportSelect.addEventListener('change', async () => {
   currentSport = sportSelect.value;
   activeFixtureFilter = 'all';
@@ -484,6 +551,8 @@ sportSelect.addEventListener('change', async () => {
   fixtures.splice(0, fixtures.length);
   setTeamHeader();
   render();
+  replayEntrance(document.querySelector('.hero'), 'sport-enter');
+  replayEntrance(document.querySelector('.controls'), 'sport-enter');
   sourceNote.textContent = `Loading ${currentTeam.name} fixtures...`;
   await loadLiveFixtures();
 });
@@ -494,3 +563,4 @@ document.querySelector('#retry-schedule').addEventListener('click', loadLiveFixt
 setTeamHeader();
 render();
 loadLiveFixtures();
+loadFollowedSlate();

@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="calendar.css">
   <link rel="stylesheet" href="calendar-updates.css">
-  <link rel="stylesheet" href="theme.css?v=20260929-stitch-source">
+  <link rel="stylesheet" href="theme.css?v=20260929-shared-slate">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
 </head>
 <body>
@@ -66,7 +66,7 @@
         <div class="week-heading"><div><p class="eyebrow">Your sports agenda</p><h2 id="week-title">My Week</h2><p id="week-fixture-count" class="week-fixture-count">Create a calendar to see your schedule.</p></div><button id="refresh-calendar" class="text-button" type="button" hidden>Refresh view</button></div>
         <div id="week-team-filters" class="week-team-filters" role="group" aria-label="Filter by followed team"></div>
         <div class="week-filters"><label>Show<select id="week-period"><option value="week">This week</option><option value="today">Today</option><option value="weekend">This weekend</option><option value="season">Full season</option></select></label><label>Sport<select id="week-sport"><option value="all">All sports</option><option value="soccer">Soccer</option><option value="nfl">NFL</option><option value="mlb">MLB</option><option value="nba">NBA</option><option value="nhl">NHL</option><option value="f1">Formula 1</option></select></label><label class="postseason-filter"><input id="week-postseason" type="checkbox"> Postseason only</label></div>
-        <div id="week-strip" class="week-strip" aria-label="Next seven days at a glance"></div>
+        <div id="week-strip" class="week-strip slate-grid" aria-label="Next seven days at a glance"></div>
         <p id="schedule-status" role="status" aria-live="polite">Choose your teams, then create a calendar to see their combined schedule.</p>
         <details id="health-details" class="calendar-insights"><summary>Schedule reliability — each team</summary><p class="field-note">A loaded feed contains currently published games, not a guarantee that every future matchup is determined. Checks may reuse provider data cached for up to an hour.</p><div id="team-health"></div></details>
         <details id="changes-details" class="calendar-insights"><summary>What changed? <span id="changes-count"></span></summary><p class="field-note">Provider changes recorded after this calendar was created, across your selected teams (including games hidden by filters). History starts after a baseline refresh and keeps up to 80 recent changes from the last 90 days. Changes to your settings are not fixture changes.</p><div id="schedule-changes"></div></details>
@@ -77,6 +77,6 @@
     <footer><span>MyFixtures</span><span>Built for matchday people</span></footer>
   </main>
   <nav class="mobile-bottom-nav" aria-label="Mobile navigation"><a href="/"><span class="material-symbols-outlined" aria-hidden="true">event</span>Fixtures</a><a href="#week-title" aria-current="page"><span class="material-symbols-outlined" aria-hidden="true">view_week</span>My Week</a><a href="#settings-title"><span class="material-symbols-outlined" aria-hidden="true">calendar_month</span>Calendar</a></nav>
-  <script type="module" src="calendar-ui.mjs?v=20260929-stitch-source"></script>
+  <script type="module" src="calendar-ui.mjs?v=20260929-shared-slate"></script>
 </body>
 </html>
