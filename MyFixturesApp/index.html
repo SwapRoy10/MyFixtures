@@ -51,11 +51,13 @@
       .series-heading { flex-wrap: wrap; gap: 12px; }
     }
   </style>
+  <link rel="stylesheet" href="theme.css">
 </head>
 <body>
   <main class="shell">
     <header class="topbar">
-      <div class="brand-group"><a class="brand" href="#">MyFixtures</a><select class="sport-select" id="sport-select" aria-label="Choose sport"><option value="soccer">Soccer</option><option value="nfl">NFL</option><option value="mlb">MLB</option><option value="nba">NBA</option><option value="nhl">NHL</option><option value="f1">Formula 1</option></select></div>
+      <div class="brand-group"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">MF</span>MyFixtures<span class="brand-edition">Edition</span></a><select class="sport-select" id="sport-select" aria-label="Choose sport"><option value="soccer">Soccer</option><option value="nfl">NFL</option><option value="mlb">MLB</option><option value="nba">NBA</option><option value="nhl">NHL</option><option value="f1">Formula 1</option></select></div>
+      <nav class="topbar-links" aria-label="Main navigation"><a class="active" href="/" aria-current="page">Fixtures</a><a href="/calendar.html">My Week</a></nav>
       <div class="topbar-meta"><span class="live-dot"></span><span>Current season</span><span class="divider"></span><select id="timezone-select" aria-label="Choose time zone"><option value="America/New_York">Eastern Time</option><option value="America/Chicago">Central Time</option><option value="America/Denver">Mountain Time</option><option value="America/Los_Angeles">Pacific Time</option><option value="Europe/London">British Time</option></select></div>
     </header>
 
@@ -66,6 +68,7 @@
         <h1>Never miss<br><em>the kickoff.</em></h1>
         <p class="lede">A focused calendar for the fixtures of all your favorite teams. Add one match or the whole season in seconds.</p>
       </div>
+      <aside class="season-pulse" aria-label="Selected season overview"><div class="pulse-top"><span>Season pulse</span><span id="pulse-season">Current season</span></div><strong id="pulse-count">—</strong><span class="pulse-caption">Games in this season view</span><div class="pulse-rule"></div><p id="pulse-next">Checking the next confirmed game…</p></aside>
     </section>
 
     <section class="controls" aria-label="Fixture controls">
@@ -82,6 +85,7 @@
 
     <section class="fixture-section">
       <div class="section-heading"><div><p class="eyebrow">Current season</p><h2>Every team. <span>Every match.</span></h2></div><p class="timezone" id="timezone-label">Times shown in Eastern Time</p></div>
+      <div class="fixture-utility"><span id="fixture-count">Loading fixtures</span><a href="/calendar.html">Build your Living Calendar <span aria-hidden="true">↗</span></a></div>
       <div id="fixture-list" class="fixture-list"></div>
       <p id="schedule-health" class="source-note" role="status">Checking the published schedule…</p><button id="retry-schedule" class="text-button" type="button">Retry schedule</button>
       <p class="source-note">Downloads and Google Calendar additions are one-time copies. <a href="/calendar.html">Subscribe for automatic updates and advanced filters</a>. Avoid importing again if you already subscribe.</p>

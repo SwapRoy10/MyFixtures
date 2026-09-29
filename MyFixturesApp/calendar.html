@@ -8,10 +8,11 @@
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="calendar.css">
   <link rel="stylesheet" href="calendar-updates.css">
+  <link rel="stylesheet" href="theme.css">
 </head>
 <body>
   <main class="shell living-shell">
-    <header class="topbar"><a class="brand" href="/">MyFixtures</a><a class="back-link" href="/">Browse team schedules</a></header>
+    <header class="topbar"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">MF</span>MyFixtures<span class="brand-edition">Edition</span></a><nav class="topbar-links" aria-label="Main navigation"><a href="/">Fixtures</a><a class="active" href="/calendar.html" aria-current="page">My Week</a></nav><a class="back-link" href="/">Browse team schedules ↗</a></header>
     <section class="living-intro"><p class="eyebrow">All your teams. One calendar.</p><h1>Your week,<br><em>in play.</em></h1><p>Follow teams across sports with one calendar subscription. Game times, venues and newly announced matchups update as schedules change.</p></section>
     <div class="living-layout">
       <section class="living-settings" aria-labelledby="settings-title">
@@ -63,6 +64,7 @@
         </section>
         <div class="week-heading"><div><p class="eyebrow">Your sports agenda</p><h2 id="week-title">My Week</h2></div><button id="refresh-calendar" class="text-button" type="button" hidden>Refresh view</button></div>
         <div class="week-filters"><label>Show<select id="week-period"><option value="week">This week</option><option value="today">Today</option><option value="weekend">This weekend</option><option value="season">Full season</option></select></label><label>Sport<select id="week-sport"><option value="all">All sports</option><option value="soccer">Soccer</option><option value="nfl">NFL</option><option value="mlb">MLB</option><option value="nba">NBA</option><option value="nhl">NHL</option><option value="f1">Formula 1</option></select></label><label class="postseason-filter"><input id="week-postseason" type="checkbox"> Postseason only</label></div>
+        <div id="week-strip" class="week-strip" aria-label="Next seven days at a glance"></div>
         <p id="schedule-status" role="status" aria-live="polite">Choose your teams, then create a calendar to see their combined schedule.</p>
         <details id="health-details" class="calendar-insights"><summary>Schedule reliability — each team</summary><p class="field-note">A loaded feed contains currently published games, not a guarantee that every future matchup is determined. Checks may reuse provider data cached for up to an hour.</p><div id="team-health"></div></details>
         <details id="changes-details" class="calendar-insights"><summary>What changed? <span id="changes-count"></span></summary><p class="field-note">Provider changes recorded after this calendar was created, across your selected teams (including games hidden by filters). History starts after a baseline refresh and keeps up to 80 recent changes from the last 90 days. Changes to your settings are not fixture changes.</p><div id="schedule-changes"></div></details>

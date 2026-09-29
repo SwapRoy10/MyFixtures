@@ -72,6 +72,7 @@ function setTeamHeader() {
   document.querySelector('#add-fixture').hidden = isF1;
   document.querySelector('.section-label').textContent = isF1 ? 'Selected championship' : 'Selected team';
   document.querySelector('.topbar-meta > span:nth-child(2)').textContent = isF1 || isMlb ? 'Season ' + new Date().getUTCFullYear() : `Season ${season.label}`;
+  document.querySelector('#pulse-season').textContent = isF1 || isMlb ? String(new Date().getUTCFullYear()) : `${season.startYear}/${String(season.endYear).slice(-2)}`;
   document.querySelector('.section-heading .eyebrow').textContent = isF1 ? new Date().getUTCFullYear() + ' Formula 1 season' : isMlb ? `${new Date().getUTCFullYear()} MLB season - today forward` : isNba || isNhl ? `${season.startYear}-${String(season.endYear).slice(-2)} ${sportLabel()} season` : `${season.label} season - July through June`;
   document.querySelector('.section-heading h2').textContent = isF1 ? 'Every Grand Prix.' : isMlb ? 'Every series. Every game.' : isNba || isNhl ? 'Every team. Every game.' : 'Every team. Every match.';
   document.querySelector('#fixture-time-label').textContent = isNhl ? 'Puck drop' : isNba ? 'Tipoff' : 'Kickoff';
@@ -142,6 +143,11 @@ function fixtureActionButton(fixture, index) {
     ? `<button class="fixture-add fixture-add-disabled" type="button" disabled>${past ? 'Played' : 'Time TBD'}</button>`
     : `<button class="fixture-add" data-index="${index}">+ Google Calendar</button>`;
 }
+function fixtureMonth(fixture) { return fixtureDisplay(fixture).date.toISOString().slice(0, 7); }
+function monthHeading(month, count, noun) {
+  const label = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' }).format(new Date(`${month}-15T12:00:00Z`));
+  return `<h3 class="month-divider"><span>${escapeHtml(label)}</span><small>${count} ${count === 1 ? noun : `${noun}s`}</small></h3>`;
+}
 function mlbGamePanel(entry, seriesIndex, gameIndex) {
   const { fixture, index } = entry;
   const display = fixtureDisplay(fixture);
@@ -156,7 +162,13 @@ function renderMlbFixtures(orderedFixtures) {
     list.innerHTML = '<div class="empty-schedule"><strong>No games currently scheduled.</strong><span>Newly determined postseason games will appear automatically.</span></div>';
     return;
   }
+  const monthCounts = new Map();
+  for (const series of renderedMlbSeries) { const month = fixtureMonth(series.games[0].fixture); monthCounts.set(month, (monthCounts.get(month) || 0) + 1); }
+  let shownMonth = '';
   list.innerHTML = renderedMlbSeries.map((series, seriesIndex) => {
+    const month = fixtureMonth(series.games[0].fixture);
+    const heading = month !== shownMonth ? monthHeading(month, monthCounts.get(month), 'series') : '';
+    shownMonth = month;
     const fixturesInSeries = series.games.map(entry => entry.fixture);
     const readyGames = calendarReadyFixtures(fixturesInSeries);
     const allHome = fixturesInSeries.every(fixture => fixture.home);
@@ -166,7 +178,7 @@ function renderMlbFixtures(orderedFixtures) {
     const countLabel = fixturesInSeries.length === 1 ? 'Single game' : `${fixturesInSeries.length}-game series`;
     const tabs = series.games.map((entry, gameIndex) => `<button class="series-tab" id="series-${seriesIndex}-tab-${gameIndex}" type="button" role="tab" aria-selected="${gameIndex === 0}" aria-controls="series-${seriesIndex}-game-${gameIndex}" tabindex="${gameIndex === 0 ? '0' : '-1'}">Game ${gameIndex + 1}</button>`).join('');
     const panels = series.games.map((entry, gameIndex) => mlbGamePanel(entry, seriesIndex, gameIndex)).join('');
-    return `<article class="series-card"><div class="series-heading"><div><p class="series-kicker">${escapeHtml(phase)} &middot; ${escapeHtml(seriesDateLabel(series))}</p><h3>${escapeHtml(countLabel)} vs ${escapeHtml(series.opponent)}</h3><p class="series-summary">${site}</p></div><button class="series-add" type="button" data-series-add="${seriesIndex}"${readyGames.length ? '' : ' disabled'}>+ Add series</button></div><div class="series-tabs" role="tablist" aria-label="Games against ${escapeHtml(series.opponent)}">${tabs}</div>${panels}</article>`;
+    return `${heading}<article class="series-card"><div class="series-heading"><div><p class="series-kicker">${escapeHtml(phase)} &middot; ${escapeHtml(seriesDateLabel(series))}</p><h3>${escapeHtml(countLabel)} vs ${escapeHtml(series.opponent)}</h3><p class="series-summary">${site}</p></div><button class="series-add" type="button" data-series-add="${seriesIndex}"${readyGames.length ? '' : ' disabled'}>+ Add series</button></div><div class="series-tabs" role="tablist" aria-label="Games against ${escapeHtml(series.opponent)}">${tabs}</div>${panels}</article>`;
   }).join('');
   list.querySelectorAll('.series-tab').forEach(tab => {
     tab.addEventListener('click', () => activateSeriesTab(tab));
@@ -190,15 +202,27 @@ function render() {
     renderMlbFixtures(orderedFixtures);
   } else {
     renderedMlbSeries = [];
+    const monthCounts = new Map();
+    for (const fixture of orderedFixtures) { const month = fixtureMonth(fixture); monthCounts.set(month, (monthCounts.get(month) || 0) + 1); }
+    let shownMonth = '';
     list.innerHTML = orderedFixtures.map((fixture, index) => {
+    const month = fixtureMonth(fixture);
+    const heading = month !== shownMonth ? monthHeading(month, monthCounts.get(month), currentSport === 'f1' ? 'race' : 'fixture') : '';
+    shownMonth = month;
     const display = fixtureDisplay(fixture);
     const dateFormat = new Intl.DateTimeFormat('en-GB', { timeZone: selectedTimeZone, day: '2-digit', month: 'short' });
     const dayFormat = new Intl.DateTimeFormat('en-GB', { timeZone: selectedTimeZone, weekday: 'short' });
     const past = isPastFixture(fixture);
     const kickoff = fixture.timeTbd ? 'TBD' : display.time;
-    return `<article class="fixture${past ? ' fixture-past' : ''}"><div class="fixture-date"><strong>${dateFormat.format(display.date)}</strong><small>${dayFormat.format(display.date)}</small></div><div><div class="opponent">${escapeHtml(currentSport === 'f1' ? fixtureTitle(fixture) : currentTeam.name + ' v ' + fixture.opponent)}</div><div class="home-away">${currentSport === 'f1' ? 'Race' : fixture.neutralSite ? 'Neutral site' : fixture.home ? 'Home' : 'Away'} &middot; ${escapeHtml(fixture.competition)}</div></div><div class="fixture-meta"><b>${kickoff}</b>${fixture.venue && fixture.venue !== 'TBC' ? `<br>${escapeHtml(fixture.venue)}` : ''}</div>${fixtureActionButton(fixture, index)}</article>`;
+    return `${heading}<article class="fixture${past ? ' fixture-past' : ''}"><div class="fixture-date"><strong>${dateFormat.format(display.date)}</strong><small>${dayFormat.format(display.date)}</small></div><div><div class="opponent">${escapeHtml(currentSport === 'f1' ? fixtureTitle(fixture) : currentTeam.name + ' v ' + fixture.opponent)}</div><div class="home-away">${currentSport === 'f1' ? 'Race' : fixture.neutralSite ? 'Neutral site' : fixture.home ? 'Home' : 'Away'} &middot; ${escapeHtml(fixture.competition)}</div></div><div class="fixture-meta"><b>${kickoff}</b>${fixture.venue && fixture.venue !== 'TBC' ? `<br>${escapeHtml(fixture.venue)}` : ''}</div>${fixtureActionButton(fixture, index)}</article>`;
     }).join('');
   }
+  document.querySelector('#fixture-count').textContent = `${orderedFixtures.length} ${orderedFixtures.length === 1 ? 'game' : 'games'} in this view`;
+  document.querySelector('#pulse-count').textContent = String(orderedFixtures.length);
+  const next = calendarReadyFixtures().sort((first, second) => fixtureSortTime(first) - fixtureSortTime(second))[0];
+  document.querySelector('#pulse-next').textContent = next
+    ? `Next confirmed: ${currentSport === 'f1' ? fixtureTitle(next) : next.opponent} · ${new Intl.DateTimeFormat('en-US', { timeZone: selectedTimeZone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(fixtureSortTime(next)))}`
+    : 'No confirmed upcoming start is currently published.';
   document.querySelectorAll('.fixture-add[data-index]').forEach(button => button.addEventListener('click', () => openGoogleCalendar(orderedFixtures[button.dataset.index])));
 }
 function formatFixtureForSelectedZone(timestamp) {

@@ -1,5 +1,5 @@
 import { conflictKeys, filterGames, gameDate, groupWeekSeries, googleGameUrl, describeChange } from './calendar-view.mjs';
-import { confirmedOpponent } from './schedule-common.mjs';
+import { confirmedOpponent, localDate } from './schedule-common.mjs';
 import { calendarGuides } from './calendar-guides.mjs';
 
 const $ = id => document.getElementById(id);
@@ -137,6 +137,14 @@ function renderDashboard() {
   if (!state) return;
   const timeZone = $('living-timezone').value;
   const games = filterGames(state.games || [], { period: $('week-period').value, sport: $('week-sport').value, postseasonOnly: $('week-postseason').checked, timeZone });
+  const outlookGames = filterGames(state.games || [], { period: 'season', sport: $('week-sport').value, postseasonOnly: $('week-postseason').checked, timeZone });
+  const today = localDate(new Date().toISOString(), timeZone);
+  $('week-strip').innerHTML = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(`${today}T12:00:00Z`); date.setUTCDate(date.getUTCDate() + index);
+    const day = date.toISOString().slice(0, 10);
+    const count = outlookGames.filter(game => gameDate(game, timeZone) === day).length;
+    return `<div class="week-day${index === 0 ? ' today' : ''}" aria-label="${escape(day)}: ${count} ${count === 1 ? 'game' : 'games'}"><small>${new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'short' }).format(date)}</small><strong>${date.getUTCDate()}</strong><span>${count ? `${count} ${count === 1 ? 'game' : 'games'}` : 'Rest day'}</span></div>`;
+  }).join('');
   const conflicts = conflictKeys(state.games || []);
   const formatter = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', month: 'short', day: 'numeric', weekday: 'short' });
   const time = new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });

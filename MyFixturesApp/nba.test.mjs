@@ -117,6 +117,9 @@ test('NBA UI renders individual games and exports all confirmed games across tim
   vm.runInContext(app, context);
   await vm.runInContext('loadLiveFixtures()', context);
   assert.equal(element('#fixture-list').innerHTML.match(/<article class="fixture/g).length, 81);
+  assert.match(element('#fixture-list').innerHTML, /class="month-divider"/);
+  assert.equal(element('#pulse-count').textContent, '81');
+  assert.match(element('#pulse-next').textContent, /Next confirmed: Opponent 0/);
   assert.equal(element('#fixture-list').innerHTML.includes('series-tab'), false);
   assert.equal(element('.hero-copy h1').innerHTML.includes('tipoff'), true);
   const event = vm.runInContext('googleCalendarEvent(fixtures[0])', context);
