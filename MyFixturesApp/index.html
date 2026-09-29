@@ -51,7 +51,8 @@
       .series-heading { flex-wrap: wrap; gap: 12px; }
     }
   </style>
-  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="theme.css?v=20260929-stitch-source">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
 </head>
 <body>
   <main class="shell">
@@ -67,14 +68,15 @@
         <p class="eyebrow">Your matchday, organised</p>
         <h1>Never miss<br><em>the kickoff.</em></h1>
         <p class="lede">A focused calendar for the fixtures of all your favorite teams. Add one match or the whole season in seconds.</p>
+        <div class="mobile-hero-actions"><button id="mobile-sync" type="button"><span class="mobile-sync-icon" aria-hidden="true">↻</span><span><strong id="mobile-sync-label">Add games to calendar</strong><small>Google Calendar · Apple · Outlook</small></span><span aria-hidden="true">↗</span></button><div class="mobile-extra-actions"><button id="mobile-add" type="button">+ Add fixture</button><button id="mobile-export" type="button">↓ Download .ics</button></div></div>
       </div>
-      <aside class="season-pulse" aria-label="Selected season overview"><div class="pulse-top"><span>Season pulse</span><span id="pulse-season">Current season</span></div><strong id="pulse-count">—</strong><span class="pulse-caption">Games in this season view</span><div class="pulse-rule"></div><p id="pulse-next">Checking the next confirmed game…</p></aside>
+      <aside class="season-pulse" aria-label="Selected season overview"><div class="pulse-top"><span>Season pulse</span><span id="pulse-season">Current season</span></div><strong id="pulse-count">—</strong><span class="pulse-caption" id="pulse-caption">To next confirmed game</span><div class="pulse-rule"></div><p id="pulse-next">Checking the next confirmed game…</p><small id="pulse-fixtures">Loading season fixtures</small></aside>
     </section>
 
     <section class="controls" aria-label="Fixture controls">
       <div>
         <p class="section-label">Selected team</p>
-        <button class="club-select" id="club-select" type="button"><span id="team-mark-wrapper"><img class="club-mark" id="club-mark" src="https://crests.football-data.org/57.png" alt="Arsenal crest"></span> <span id="club-name">Arsenal</span> <span class="chevron">⌄</span></button>
+        <button class="club-select" id="club-select" type="button"><span id="team-mark-wrapper"><img class="club-mark" id="club-mark" src="https://crests.football-data.org/57.png" alt="Arsenal crest"></span> <span class="team-selection-copy"><span id="club-name">Arsenal</span><small id="mobile-team-season"></small></span> <span class="chevron">⌄</span></button>
       </div>
       <div class="control-actions">
         <button id="add-fixture" class="button button-outline" type="button"><span>＋</span> Add fixture</button>
@@ -83,9 +85,13 @@
       </div>
     </section>
 
+    <section class="mlb-subscription" aria-labelledby="mlb-subscription-title"><div><p class="eyebrow">Living subscription</p><h2 id="mlb-subscription-title">One subscription. Zero manual entry.</h2><p>Follow schedule changes through a calendar feed, including newly confirmed postseason games. Your calendar app controls when it refreshes.</p></div><a class="button button-solid" href="/calendar.html#settings-title">Build a living calendar ↗</a></section>
+    <section class="mlb-week" aria-labelledby="mlb-week-title"><div class="mlb-week-heading"><div><p class="eyebrow">Seven-day slate</p><h2 id="mlb-week-title">This week’s games</h2></div><a href="/calendar.html#week-title">Open My Week ↗</a></div><div id="mlb-week-grid"></div></section>
+
     <section class="fixture-section">
       <div class="section-heading"><div><p class="eyebrow">Current season</p><h2>Every team. <span>Every match.</span></h2></div><p class="timezone" id="timezone-label">Times shown in Eastern Time</p></div>
       <div class="fixture-utility"><span id="fixture-count">Loading fixtures</span><a href="/calendar.html">Build your Living Calendar <span aria-hidden="true">↗</span></a></div>
+      <div class="fixture-filters" role="group" aria-label="Filter fixtures"><button class="active" type="button" data-fixture-filter="all" aria-pressed="true">All <span id="filter-all-count"></span></button><button type="button" data-fixture-filter="week" aria-pressed="false">Next 7 days <span id="filter-week-count"></span></button><button type="button" data-fixture-filter="upcoming" aria-pressed="false">Upcoming <span id="filter-upcoming-count"></span></button><button type="button" data-fixture-filter="played" aria-pressed="false">Played <span id="filter-played-count"></span></button><button type="button" data-fixture-filter="home" aria-pressed="false">Home <span id="filter-home-count"></span></button></div>
       <div id="fixture-list" class="fixture-list"></div>
       <p id="schedule-health" class="source-note" role="status">Checking the published schedule…</p><button id="retry-schedule" class="text-button" type="button">Retry schedule</button>
       <p class="source-note">Downloads and Google Calendar additions are one-time copies. <a href="/calendar.html">Subscribe for automatic updates and advanced filters</a>. Avoid importing again if you already subscribe.</p>
@@ -96,6 +102,7 @@
 
     <footer><span>MyFixtures</span><span>Built for matchday people</span></footer>
   </main>
+  <nav class="mobile-bottom-nav" aria-label="Mobile navigation"><a href="/" aria-current="page"><span class="material-symbols-outlined" aria-hidden="true">event</span>Fixtures</a><a href="/calendar.html#week-title"><span class="material-symbols-outlined" aria-hidden="true">view_week</span>My Week</a><a href="/calendar.html#settings-title"><span class="material-symbols-outlined" aria-hidden="true">calendar_month</span>Calendar</a></nav>
 
   <dialog id="fixture-dialog">
     <form method="dialog" id="fixture-form">
@@ -118,6 +125,6 @@
     </form>
   </dialog>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="app.js?v=20260924-reliability-2"></script>
+  <script src="app.js?v=20260929-stitch-source"></script>
 </body>
 </html>

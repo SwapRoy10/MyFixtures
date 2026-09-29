@@ -118,9 +118,17 @@ test('NBA UI renders individual games and exports all confirmed games across tim
   await vm.runInContext('loadLiveFixtures()', context);
   assert.equal(element('#fixture-list').innerHTML.match(/<article class="fixture/g).length, 81);
   assert.match(element('#fixture-list').innerHTML, /class="month-divider"/);
-  assert.equal(element('#pulse-count').textContent, '81');
+  assert.match(element('#pulse-count').textContent, /^\d+d \d{2}h$/);
+  assert.equal(element('#pulse-fixtures').textContent, '81 fixtures in this season view');
   assert.match(element('#pulse-next').textContent, /Next confirmed: Opponent 0/);
   assert.equal(element('#fixture-list').innerHTML.includes('series-tab'), false);
+  vm.runInContext("activeFixtureFilter = 'home'; render()", context);
+  assert.equal(element('#fixture-list').innerHTML.match(/<article class="fixture/g).length, 1);
+  assert.equal(element('#fixture-count').textContent, '1 game in this view');
+  assert.equal(element('#pulse-fixtures').textContent, '81 fixtures in this season view');
+  vm.runInContext('downloadCalendar(fixtures)', context);
+  assert.equal((await downloaded.text()).match(/BEGIN:VEVENT/g).length, 80);
+  vm.runInContext("activeFixtureFilter = 'all'; render()", context);
   assert.equal(element('.hero-copy h1').innerHTML.includes('tipoff'), true);
   const event = vm.runInContext('googleCalendarEvent(fixtures[0])', context);
   assert.equal(event.start.dateTime, '2099-10-20T20:00:00');

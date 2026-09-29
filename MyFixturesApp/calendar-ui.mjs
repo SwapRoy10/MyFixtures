@@ -26,6 +26,7 @@ let loadGeneration = 0;
 let dirty = false;
 let chosenCompetitions = [];
 const openSeries = new Set(), activeGames = new Map();
+let activeWeekTeam = 'all';
 let teams = (stored('fixture-saved-clubs') || []).map(t => ({ ...t, sport: t.sport || 'soccer' })).slice(0, 12);
 if (!teams.length) {
   const selected = stored('fixture-current-team');
@@ -136,8 +137,15 @@ function links() {
 function renderDashboard() {
   if (!state) return;
   const timeZone = $('living-timezone').value;
-  const games = filterGames(state.games || [], { period: $('week-period').value, sport: $('week-sport').value, postseasonOnly: $('week-postseason').checked, timeZone });
-  const outlookGames = filterGames(state.games || [], { period: 'season', sport: $('week-sport').value, postseasonOnly: $('week-postseason').checked, timeZone });
+  const followedTeams = state.config?.teams || teams;
+  if (activeWeekTeam !== 'all' && !followedTeams.some(team => key(team) === activeWeekTeam)) activeWeekTeam = 'all';
+  const teamVisible = game => activeWeekTeam === 'all' || (game.selectedTeams || []).includes(activeWeekTeam);
+  const periodGames = filterGames(state.games || [], { period: $('week-period').value, sport: $('week-sport').value, postseasonOnly: $('week-postseason').checked, timeZone });
+  const games = periodGames.filter(teamVisible);
+  const outlookGames = filterGames(state.games || [], { period: 'season', sport: $('week-sport').value, postseasonOnly: $('week-postseason').checked, timeZone }).filter(teamVisible);
+  $('week-fixture-count').textContent = `${games.length} ${games.length === 1 ? 'fixture' : 'fixtures'} in this view`;
+  $('week-team-filters').innerHTML = `<button type="button" data-week-team="all" aria-pressed="${activeWeekTeam === 'all'}">All teams (${periodGames.length})</button>${followedTeams.map(team => `<button type="button" data-week-team="${escape(key(team))}" aria-pressed="${activeWeekTeam === key(team)}">${escape(team.name)}</button>`).join('')}`;
+  $('week-team-filters').querySelectorAll('[data-week-team]').forEach(button => button.addEventListener('click', () => { activeWeekTeam = button.dataset.weekTeam; renderDashboard(); }));
   const today = localDate(new Date().toISOString(), timeZone);
   $('week-strip').innerHTML = Array.from({ length: 7 }, (_, index) => {
     const date = new Date(`${today}T12:00:00Z`); date.setUTCDate(date.getUTCDate() + index);
@@ -145,7 +153,7 @@ function renderDashboard() {
     const count = outlookGames.filter(game => gameDate(game, timeZone) === day).length;
     return `<div class="week-day${index === 0 ? ' today' : ''}" aria-label="${escape(day)}: ${count} ${count === 1 ? 'game' : 'games'}"><small>${new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'short' }).format(date)}</small><strong>${date.getUTCDate()}</strong><span>${count ? `${count} ${count === 1 ? 'game' : 'games'}` : 'Rest day'}</span></div>`;
   }).join('');
-  const conflicts = conflictKeys(state.games || []);
+  const conflicts = conflictKeys(games);
   const formatter = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', month: 'short', day: 'numeric', weekday: 'short' });
   const time = new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
   $('overlap-note').hidden = !games.some(g => conflicts.has(g.key));

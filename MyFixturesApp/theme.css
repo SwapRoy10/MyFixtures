@@ -220,3 +220,236 @@ input, .living-settings select, .week-filters select { border-radius: 2px; }
   .button, .fixture, .fixture-add, .series-add { transition: none; }
   .button:hover { transform: none; }
 }
+
+/* Stitch export fidelity: shared desktop ledger and mobile card layouts. */
+:root {
+  --ink: #1b1c1a;
+  --muted: #5e5e62;
+  --paper: #fbf9f6;
+  --warm: #fbf9f6;
+  --red: #af2807;
+  --deep-red: #8b1a00;
+  --line: #e4e2df;
+  --surface-low: #f5f3f0;
+  --surface-mid: #efeeeb;
+}
+body { background: var(--warm); }
+.shell { max-width: 1240px; padding: 0 40px; background: var(--warm); box-shadow: none; }
+.topbar { position: relative; height: 64px; border-color: var(--line); }
+.brand-mark { border-radius: 50%; width: 27px; height: 27px; background: var(--red); }
+.topbar-links a.active { background: var(--red); color: white; border: 0; border-radius: 3px; align-self: center; height: 30px; }
+.topbar-links a { border: 0; }
+.living-nav { padding-top: 15px; text-align: right; }
+.hero { min-height: 0; padding: 42px 0 36px; align-items: end; gap: 40px; }
+.hero h1 { font-size: clamp(54px, 6vw, 72px); line-height: .92; letter-spacing: -.055em; }
+.hero h1 em { color: var(--red); }
+.lede { margin-top: 20px; max-width: 650px; font-size: 17px; line-height: 1.5; }
+.season-pulse { width: 340px; min-width: 300px; padding: 19px; border-radius: 5px; box-shadow: 0 2px 8px #1b1c1a0a; }
+.pulse-top { padding-bottom: 10px; border-bottom: 1px solid var(--line); color: var(--muted); }
+.pulse-top span:last-child { color: var(--red); }
+.season-pulse strong { margin-top: 15px; font-size: 39px; }
+.pulse-caption { display: block; margin-top: 6px; text-transform: uppercase; font-size: 10px; font-weight: 800; }
+.pulse-rule { height: 7px; margin: 17px 0 12px; border-radius: 6px; background: linear-gradient(90deg, var(--red) 68%, var(--surface-mid) 68%); }
+.season-pulse p { min-height: 0; font-weight: 700; }
+#pulse-fixtures { display: block; margin-top: 6px; color: var(--muted); text-transform: uppercase; font: 700 9px Inter, Arial, sans-serif; }
+.controls { margin: 0 0 15px; padding: 21px 24px; border: 1px solid var(--line); border-radius: 7px; box-shadow: 0 2px 8px #1b1c1a08; }
+.controls .section-label { color: var(--muted); }
+.club-select { padding: 8px 12px; border: 1px solid var(--line); border-radius: 5px; background: var(--warm); text-align: left; }
+.team-selection-copy { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.team-selection-copy small { display: none; }
+.club-select #club-name { font-size: 15px; text-transform: uppercase; }
+.club-select .chevron { color: var(--red); }
+.button, .fixture-add, .series-add { border-radius: 3px; text-transform: uppercase; font-weight: 800; }
+.button-solid, .fixture-add, .series-add { background: var(--ink); border-color: var(--ink); }
+.button-solid:hover, .fixture-add:hover, .series-add:hover { background: var(--red); border-color: var(--red); }
+.mobile-hero-actions, .mobile-bottom-nav { display: none; }
+.fixture-section { padding: 0 0 72px; }
+.fixture-section > .section-heading, .fixture-utility { display: none; }
+.fixture-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; padding: 16px 0 18px; margin-bottom: 16px; border-bottom: 2px solid var(--ink); }
+.fixture-filters button { min-height: 32px; padding: 6px 12px; border: 0; border-radius: 18px; background: var(--surface-mid); color: var(--muted); cursor: pointer; font: 700 11px Chivo, Arial, sans-serif; text-transform: uppercase; }
+.fixture-filters button:hover { background: var(--line); color: var(--ink); }
+.fixture-filters button.active { background: var(--ink); color: white; }
+.fixture-filters button span { opacity: .72; }
+.fixture-filters button[hidden] { display: none; }
+.month-divider { padding: 16px 0 9px; border-bottom: 1px solid var(--ink); font-size: 24px; }
+.month-divider small { font-size: 10px; text-transform: uppercase; }
+.ledger-columns { display: grid; grid-template-columns: minmax(145px, 17fr) minmax(250px, 42fr) minmax(150px, 25fr) minmax(135px, 16fr); gap: 14px; padding: 10px 16px; background: var(--surface-low); color: var(--muted); text-transform: uppercase; font: 800 9px Chivo, Arial, sans-serif; letter-spacing: .08em; }
+.ledger-columns span:last-child { text-align: right; }
+.fixture { display: grid; grid-template-columns: minmax(145px, 17fr) minmax(250px, 42fr) minmax(150px, 25fr) minmax(135px, 16fr); min-height: 90px; gap: 14px; align-items: center; margin: 0; padding: 14px 16px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: white; box-shadow: none; }
+.fixture:hover { background: var(--surface-low); border-color: var(--line); box-shadow: none; }
+.fixture-date { display: flex; flex-direction: column; gap: 2px; }
+.fixture-date strong { font-size: 21px; line-height: 1; }
+.fixture-date small { color: var(--red); }
+.fixture-kickoff { margin-top: 5px; color: var(--ink); font: 800 12px Chivo, Arial, sans-serif; }
+.fixture-matchup { min-width: 0; }
+.fixture-status { display: inline-block; margin-bottom: 4px; padding: 2px 5px; border-radius: 2px; background: var(--red); color: white; text-transform: uppercase; font: 800 8px Chivo, Arial, sans-serif; }
+.opponent { display: flex; flex-wrap: wrap; gap: 7px; align-items: baseline; font-size: 16px; }
+.opponent > span { font-weight: 600; }
+.opponent .selected-team { font-weight: 900; color: var(--ink); }
+.matchup-vs { color: var(--muted); font-size: 10px; text-transform: uppercase; }
+.home-away { margin-top: 5px; font-size: 10px; }
+.fixture-meta { display: flex; flex-direction: column; gap: 4px; color: var(--ink); font-weight: 600; }
+.venue-label { color: var(--muted); text-transform: uppercase; font: 800 9px Inter, Arial, sans-serif; }
+.fixture-add { justify-self: end; background: var(--surface-mid); border-color: var(--surface-mid); color: var(--ink); padding: 9px 10px; font-size: 10px; }
+.fixture-add:hover { color: white; }
+.fixture-add-disabled, .fixture-add-disabled:hover { background: var(--surface-low); border-color: var(--surface-low); color: var(--muted); }
+.fixture-past { filter: none; opacity: .62; background: var(--surface-low); }
+.fixture-list .empty-schedule { background: white; border-bottom: 1px solid var(--line); }
+.series-card { overflow: hidden; margin: 0 0 20px; padding: 0; border: 1px solid var(--line); border-radius: 5px; box-shadow: 0 2px 8px #1b1c1a08; }
+.series-heading { padding: 22px 24px; background: var(--surface-low); }
+.series-heading h3 { margin: 4px 0; font-size: 22px; }
+.series-summary { color: var(--muted); }
+.series-kicker { color: var(--red); }
+.series-add { padding: 11px 15px; }
+.series-tabs { margin: 0; padding: 10px 16px 0; background: white; }
+.series-tab { border-radius: 3px 3px 0 0; }
+.fixture.series-game { display: grid; grid-template-columns: 100px minmax(0, 1fr) 170px 150px; gap: 16px; margin: 0; padding: 17px 22px; border-top: 1px solid var(--line); background: white; }
+.fixture.series-game .opponent { display: block; }
+.fixture.series-game .fixture-meta { text-align: right; }
+.fixture.series-game .fixture-meta b { font-size: 15px; }
+.mlb-subscription, .mlb-week { display: none; }
+body[data-sport="mlb"] .mlb-subscription { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin: 8px 0 30px; padding: 24px; border: 1px solid var(--line); border-radius: 6px; background: white; }
+.mlb-subscription h2, .mlb-week h2 { margin: 4px 0 8px; font: 900 23px Chivo, Arial, sans-serif; text-transform: uppercase; letter-spacing: -.04em; }
+.mlb-subscription p:last-child { max-width: 660px; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.mlb-subscription a { white-space: nowrap; text-decoration: none; }
+body[data-sport="mlb"] .mlb-week { display: block; margin-bottom: 32px; }
+.mlb-week-heading { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.mlb-week-heading a { color: var(--red); font: 800 11px Inter, Arial, sans-serif; text-transform: uppercase; text-decoration: none; }
+#mlb-week-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; padding: 5px; border-radius: 5px; background: var(--surface-low); }
+.mlb-week-day { min-height: 128px; min-width: 0; padding: 10px; background: white; }
+.mlb-week-day.today { border-top: 3px solid var(--red); padding-top: 7px; }
+.mlb-week-date { display: flex; justify-content: space-between; gap: 4px; padding-bottom: 8px; color: var(--muted); text-transform: uppercase; font: 800 9px Inter, Arial, sans-serif; }
+.mlb-week-date span { color: var(--red); }
+.mlb-week-game { display: flex; flex-direction: column; gap: 5px; padding: 7px; margin-top: 4px; background: var(--surface-low); font: 700 10px Inter, Arial, sans-serif; }
+.mlb-week-game span { color: var(--red); }
+.mlb-week-day > small { color: var(--muted); }
+body[data-sport="mlb"] .fixture-section > .section-heading { display: flex; padding-bottom: 10px; }
+body[data-sport="mlb"] .fixture-filters { margin-top: 10px; }
+.living-shell .topbar { margin-bottom: 0; }
+.living-intro { padding: 44px 0 28px; }
+.living-intro h1 { font-size: clamp(52px, 5.8vw, 72px); }
+.living-layout { gap: 24px; }
+.week-strip { gap: 5px; padding: 6px; border-radius: 7px; background: white; box-shadow: 0 2px 8px #1b1c1a08; }
+.week-day { border: 0; border-radius: 4px; background: white; }
+.week-day.today { background: var(--surface-mid); border-top: 0; padding-top: 11px; }
+.week-day span { font-size: 9px; }
+#week-games > .week-card { border: 0; border-radius: 7px; box-shadow: 0 2px 8px #1b1c1a08; }
+.week-card h3 { font-weight: 900; }
+.week-fixture-count { margin: 7px 0 0; color: var(--muted); font-size: 12px; }
+.week-team-filters { display: flex; gap: 7px; overflow-x: auto; padding: 14px 0 3px; scrollbar-width: none; }
+.week-team-filters::-webkit-scrollbar { display: none; }
+.week-team-filters button { flex: 0 0 auto; min-height: 31px; padding: 7px 12px; border: 0; border-radius: 17px; background: var(--surface-mid); color: var(--ink); cursor: pointer; font: 800 11px Chivo, Arial, sans-serif; text-transform: uppercase; }
+.week-team-filters button[aria-pressed="true"] { background: var(--ink); color: white; }
+.week-team-filters button:hover { background: var(--red); color: white; }
+.living-settings, .subscription-panel { border-radius: 6px; box-shadow: 0 2px 8px #1b1c1a08; }
+
+@media (max-width: 1050px) {
+  .shell { padding: 0 28px; }
+  .fixture, .ledger-columns { grid-template-columns: 125px minmax(220px, 1fr) 145px 130px; gap: 10px; }
+  .fixture.series-game { grid-template-columns: 85px minmax(0, 1fr) 140px 130px; }
+}
+
+@media (max-width: 760px) {
+  .shell { display: flex; flex-direction: column; padding: 0 16px 90px; }
+  .topbar { position: sticky; top: 0; z-index: 30; order: 0; height: 56px; min-height: 56px; padding: 0; margin: 0 -16px; padding-inline: 16px; flex-wrap: nowrap; background: #fbf9f6f2; backdrop-filter: blur(16px); }
+  .brand-group { width: auto; gap: 8px; }
+  .brand { font-size: 0; gap: 0; }
+  .brand-mark { width: 29px; height: 29px; background: transparent; color: var(--ink); font-size: 14px; letter-spacing: -.07em; }
+  .brand .brand-mark { color: var(--ink); }
+  .brand-mark::before { content: ''; width: 8px; height: 8px; margin-right: 2px; border-radius: 50%; background: var(--red); }
+  .brand-edition, .topbar-links, .living-nav { display: none; }
+  .sport-select { min-width: 0; max-width: 116px; padding: 8px; border: 0; border-radius: 3px; background: var(--surface-mid); font-size: 11px; }
+  .topbar-meta { margin-left: auto; padding: 0; }
+  .topbar-meta > span { display: none; }
+  .topbar-meta select { max-width: 106px; padding: 8px; border: 0; border-radius: 3px; background: var(--surface-low); font-size: 10px; }
+  .controls { order: 1; margin: 10px 0 8px; padding: 0; border: 0; box-shadow: none; background: transparent; }
+  .controls .section-label, .control-actions { display: none; }
+  .club-select { display: flex; width: 100%; min-height: 66px; padding: 10px 12px; border: 0; border-radius: 7px; background: white; box-shadow: 0 2px 8px #1b1c1a0a; }
+  .club-select #club-name { font-size: 17px; }
+  .team-selection-copy small { display: block; color: var(--muted); text-transform: uppercase; font: 800 9px Inter, Arial, sans-serif; letter-spacing: .06em; }
+  .club-select .chevron { margin-left: auto; }
+  .hero { order: 2; display: block; min-height: 0; margin: 0; padding: 0; }
+  .hero-copy { padding: 17px; border-radius: 7px; background: white; box-shadow: 0 2px 8px #1b1c1a0a; }
+  .hero h1 { font-size: 29px; line-height: 1.04; letter-spacing: -.04em; }
+  .hero h1 br { display: none; }
+  .hero h1 em { font-style: normal; text-decoration: underline; text-decoration-color: #af280733; text-underline-offset: 3px; }
+  .hero .eyebrow { margin-bottom: 7px; }
+  .hero .lede { margin: 9px 0 0; font-size: 12px; line-height: 1.45; }
+  .season-pulse { display: none; }
+  .mobile-hero-actions { display: block; margin-top: 13px; }
+  #mobile-sync { display: flex; align-items: center; width: 100%; gap: 10px; padding: 10px 12px; border: 0; border-radius: 5px; background: var(--ink); color: white; text-align: left; cursor: pointer; }
+  #mobile-sync:hover { background: var(--red); }
+  #mobile-sync > span:nth-child(2) { display: flex; flex-direction: column; flex: 1; gap: 2px; }
+  #mobile-sync strong { font: 800 13px Chivo, Arial, sans-serif; }
+  #mobile-sync small { color: #e4e2df; font-size: 10px; }
+  .mobile-sync-icon { color: #ffb4a3; font-size: 20px; }
+  .mobile-extra-actions { display: flex; gap: 8px; margin-top: 8px; }
+  .mobile-extra-actions button { flex: 1; min-height: 34px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface-low); color: var(--muted); font: 700 10px Inter, Arial, sans-serif; }
+  .mobile-extra-actions button[hidden] { display: none; }
+  .fixture-section { order: 3; padding: 0 0 40px; }
+  .fixture-section > .section-heading, .fixture-utility { display: none !important; }
+  .fixture-filters { flex-wrap: nowrap; overflow-x: auto; gap: 6px; margin: 0; padding: 12px 0 7px; border: 0; scrollbar-width: none; }
+  .fixture-filters::-webkit-scrollbar { display: none; }
+  .fixture-filters button { flex: 0 0 auto; min-height: 31px; padding: 7px 11px; text-transform: none; font-family: Inter, Arial, sans-serif; }
+  .month-divider { padding: 17px 0 8px; font-size: 17px; border: 0; }
+  .ledger-columns { display: none; }
+  .fixture { display: flex; flex-direction: column; align-items: stretch; gap: 10px; min-height: 0; margin: 0 0 9px; padding: 14px; border: 0; border-radius: 7px; box-shadow: 0 2px 8px #1b1c1a0a; }
+  .fixture:hover { box-shadow: 0 2px 8px #1b1c1a0a; }
+  .fixture-date { display: flex; flex-direction: row; align-items: baseline; gap: 6px; padding-bottom: 7px; border-bottom: 1px solid var(--line); }
+  .fixture-date strong { font-size: 13px; }
+  .fixture-date small { font-size: 9px; }
+  .fixture-kickoff { margin: 0 0 0 auto; font-size: 11px; }
+  .fixture-status { margin: 0 0 7px; border-radius: 10px; padding: 3px 7px; }
+  .opponent { gap: 5px; font-size: 17px; }
+  .home-away { margin-top: 4px; }
+  .fixture-meta { display: flex; flex-direction: row; gap: 5px; padding-top: 7px; border-top: 1px solid var(--line); font-size: 10px; }
+  .fixture-add { align-self: stretch; justify-self: stretch; width: 100%; min-height: 34px; margin: 0; background: var(--surface-low); }
+  .fixture.series-game { display: grid; grid-template-columns: 65px minmax(0, 1fr); gap: 9px; padding: 13px; }
+  .fixture.series-game .fixture-date { grid-row: 1 / span 3; display: flex; flex-direction: column; align-items: start; border: 0; }
+  .fixture.series-game .fixture-meta { grid-column: 2; padding: 0; border: 0; text-align: left; }
+  .fixture.series-game .fixture-add { grid-column: 2; }
+  .series-card { margin-bottom: 13px; }
+  .series-heading { padding: 14px; }
+  .series-tabs { padding: 7px 10px 0; }
+  .mlb-subscription { order: 3; }
+  .mlb-week { order: 3; }
+  body[data-sport="mlb"] .mlb-subscription { display: block; margin: 13px 0; padding: 17px; }
+  .mlb-subscription a { display: inline-block; margin-top: 13px; white-space: normal; }
+  body[data-sport="mlb"] .mlb-week { margin: 7px 0 15px; }
+  #mlb-week-grid { overflow-x: auto; grid-template-columns: repeat(7, minmax(100px, 1fr)); }
+  .mlb-week-day { min-height: 110px; }
+  .how-it-works, footer { order: 4; }
+  .mobile-bottom-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: flex; justify-content: space-around; min-height: 61px; padding: 5px 10px max(5px, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: #fbf9f6f5; backdrop-filter: blur(15px); }
+  .mobile-bottom-nav a { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--muted); text-decoration: none; text-transform: uppercase; font: 800 9px Inter, Arial, sans-serif; }
+  .mobile-bottom-nav a[aria-current="page"] { color: var(--red); }
+  .mobile-bottom-nav a span { font-size: 21px; line-height: 1; }
+  .living-shell .topbar { order: 0; }
+  .living-shell .back-link { display: none; }
+  .living-intro { display: none; }
+  .living-layout { order: 1; display: flex; flex-direction: column; gap: 20px; padding-top: 12px; }
+  .living-main { order: 0; display: flex; flex-direction: column; }
+  .week-heading { order: 0; }
+  .week-team-filters { order: 1; }
+  .week-filters { order: 2; }
+  .week-strip { order: 3; }
+  #schedule-status { order: 4; }
+  #overlap-note { order: 5; }
+  #week-games { order: 6; }
+  #subscription-panel { order: 7; margin-top: 24px; }
+  #health-details { order: 8; }
+  #changes-details { order: 9; }
+  .living-settings { order: 1; }
+  .week-heading h2 { font-size: 29px; }
+  .week-filters { display: flex; flex-wrap: wrap; gap: 9px; }
+  .week-filters > label { min-width: 120px; }
+  .week-strip { grid-template-columns: repeat(7, minmax(36px, 1fr)); overflow: visible; gap: 2px; padding: 5px; }
+  .week-day { min-width: 0; min-height: 60px; padding: 7px 2px; }
+  .week-day.today { padding-top: 7px; }
+  .week-day strong { font-size: 14px; }
+  .week-day small { font-size: 8px; }
+  .week-day span { font-size: 7px; }
+  #week-games { gap: 9px; }
+  #week-games > .week-card { padding: 14px; }
+  .subscription-panel { padding: 18px; }
+  #week-title, #settings-title { scroll-margin-top: 75px; }
+}
