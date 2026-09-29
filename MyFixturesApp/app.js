@@ -2,6 +2,7 @@ const fixtures = [];
 let activeFixtureFilter = 'all';
 let followedSlate = null;
 let followedSlateState = 'selected';
+let followedSlateLoadId = 0;
 const appRelease = '20260924-reliability-2';
 const scheduleSnapshots = new Map();
 const f1Selection = { id: 'f1', sport: 'f1', name: 'Formula 1', abbreviation: 'F1', crest: 'https://city-png.b-cdn.net/thumbnail/thumbnail_public/uploads/preview/hd-f1-the-official-formula-1-transparent-png-701751712229525ajvwddtfme.png?v=2025092211' };
@@ -202,20 +203,24 @@ function replayEntrance(element, className = 'content-enter') {
   element.classList.add(className);
 }
 async function loadFollowedSlate() {
+  const loadId = ++followedSlateLoadId;
   let id;
   try { id = JSON.parse(localStorage.getItem('living-calendar-owner') || 'null')?.id; } catch { return; }
-  if (!/^[a-f0-9]{32}$/.test(id || '')) return;
+  if (!/^[a-f0-9]{32}$/.test(id || '')) { const wasCombined = Boolean(followedSlate); followedSlate = null; followedSlateState = 'selected'; if (wasCombined) renderSevenDaySlate(); return; }
+  if (followedSlate?.id !== id) followedSlate = null;
   followedSlateState = 'loading';
   renderSevenDaySlate();
   try {
     const response = await fetch(`/api/calendars/${id}`, { signal: globalThis.AbortSignal?.timeout(25000) });
     if (!response.ok) throw new Error(`My Week returned ${response.status}`);
     const data = await response.json();
+    if (loadId !== followedSlateLoadId) return;
     if (data.revoked || !Array.isArray(data.games)) throw new Error('My Week is unavailable');
-    followedSlate = { games: data.games, teamCount: data.config?.teams?.length || 0 };
+    followedSlate = { id, games: data.games, teamCount: data.config?.teams?.length || 0 };
     followedSlateState = data.ready ? 'current' : 'preparing';
     try { localStorage.setItem(`myweek-slate:${id}`, JSON.stringify({ ...followedSlate, savedAt: Date.now() })); } catch { /* The live slate still works without browser storage. */ }
   } catch {
+    if (loadId !== followedSlateLoadId) return;
     try {
       const saved = JSON.parse(localStorage.getItem(`myweek-slate:${id}`) || 'null');
       if (Array.isArray(saved?.games)) { followedSlate = saved; followedSlateState = 'stale'; }
@@ -564,3 +569,4 @@ setTeamHeader();
 render();
 loadLiveFixtures();
 loadFollowedSlate();
+window.addEventListener?.('pageshow', event => { if (event.persisted) loadFollowedSlate(); });

@@ -146,7 +146,8 @@ test('NBA UI renders individual games and exports all confirmed games across tim
   const followedGames = ['soccer', 'nba', 'mlb'].map((sport, index) => ({ sport, title: `${sport} followed game`, utcDate: `${today}T${18 + index}:00:00Z`, timeTbd: false }));
   const oldGetItem = context.localStorage.getItem;
   let savedSlate;
-  context.localStorage.getItem = key => key === 'living-calendar-owner' ? JSON.stringify({ id: calendarId }) : key === `myweek-slate:${calendarId}` ? savedSlate : oldGetItem(key);
+  let ownerPresent = true;
+  context.localStorage.getItem = key => key === 'living-calendar-owner' ? ownerPresent ? JSON.stringify({ id: calendarId }) : null : key === `myweek-slate:${calendarId}` ? savedSlate : oldGetItem(key);
   context.localStorage.setItem = (key, value) => { if (key === `myweek-slate:${calendarId}`) savedSlate = value; };
   context.fetch = async url => { assert.equal(url, `/api/calendars/${calendarId}`); return { ok: true, json: async () => ({ ready: true, games: followedGames, config: { teams: [{ id: 1 }, { id: 2 }] } }) }; };
   await vm.runInContext('loadFollowedSlate()', context);
@@ -159,4 +160,8 @@ test('NBA UI renders individual games and exports all confirmed games across tim
   await vm.runInContext('loadFollowedSlate()', context);
   assert.match(element('#slate-source').textContent, /last saved slate/);
   assert.equal(element('#slate-grid').innerHTML.match(/class="slate-game"/g).length, 3);
+  ownerPresent = false;
+  await vm.runInContext('loadFollowedSlate()', context);
+  assert.match(element('#slate-source').textContent, /create My Week to combine teams/);
+  assert.equal(element('#slate-grid').innerHTML.includes('followed game'), false);
 });
