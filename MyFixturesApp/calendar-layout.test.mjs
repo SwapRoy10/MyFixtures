@@ -11,6 +11,7 @@ test('My Week puts the seven-day slate before calendar subscription tools', () =
   assert.ok(positions.every((position) => position >= 0));
   assert.deepEqual(positions, [...positions].sort((a, b) => a - b));
   assert.doesNotMatch(page, /class="living-intro"/);
+  assert.doesNotMatch(page, /Browse team schedules/);
 });
 
 test('Calendar setup keeps optional controls available without duplicating navigation', () => {
