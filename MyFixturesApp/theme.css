@@ -485,3 +485,59 @@ body { animation: page-arrive .27s ease-out both; }
   .sport-menu, .sport-menu-button, .sport-menu-chevron, .sport-menu button, select { transition: none; }
   ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
 }
+
+/* Keep the seven-day agenda visible before calendar setup and subscription tools. */
+.living-layout { grid-template-columns: minmax(235px, 280px) minmax(0, 1fr); gap: 18px; padding-top: 18px; }
+.living-main { display: flex; flex-direction: column; min-width: 0; }
+.week-heading { order: 0; padding-top: 0; }
+.week-team-filters { order: 1; }
+.week-filters { order: 2; margin: 10px 0; }
+.week-strip { order: 3; margin: 10px 0; }
+#schedule-status { order: 4; margin: 6px 0; }
+#overlap-note { order: 5; }
+#week-games { order: 6; }
+#subscription-panel { order: 7; margin: 18px 0 0; }
+#health-details { order: 8; }
+#changes-details { order: 9; }
+
+.living-settings { padding: 16px; }
+.living-settings h2, .subscription-panel h2 { font-size: 19px; margin-bottom: 5px; }
+.living-settings h3 { margin: 15px 0 7px; font-size: 11px; }
+.living-settings p, .subscription-panel p { font-size: 11px; line-height: 1.4; }
+#ownership-note { margin: 0 0 12px; }
+.living-settings label { margin: 9px 0 4px; }
+.living-settings select, .living-settings input, .week-filters select { padding: 8px; font-size: 11px; }
+.search-row { gap: 5px; }
+.search-row button { padding: 7px; font-size: 10px; }
+.team-chips { gap: 5px; max-height: 144px; overflow-y: auto; }
+.team-chips li { padding: 6px 8px; font-size: 11px; }
+.team-chips small { margin-bottom: 2px; }
+.team-chips button { padding: 1px 3px; }
+.calendar-options { margin-top: 12px; border-top: 1px solid var(--line); }
+.calendar-options > summary { padding: 10px 0 4px; color: var(--deep-red); font: 800 10px Inter, Arial, sans-serif; text-transform: uppercase; cursor: pointer; }
+.calendar-options > summary:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+.calendar-options .calendar-checks { margin: 10px 0; }
+.calendar-options .calendar-checks label { margin: 7px 0; }
+.calendar-options .advanced-calendar { margin: 12px 0; padding: 10px; }
+.calendar-options .advanced-calendar legend { font-size: 10px; }
+.calendar-options .field-note { margin: 5px 0; font-size: 10px !important; }
+#save-calendar { margin-top: 9px; padding: 9px 12px; font-size: 11px; }
+
+.subscription-panel { padding: 16px; }
+.subscription-panel .eyebrow { margin: 0 0 4px; }
+.subscription-panel > p { margin: 5px 0 9px; }
+.subscription-panel > label { display: block; margin: 7px 0 4px; }
+.subscription-panel input[readonly] { width: 100%; padding: 8px; font-size: 10px; }
+.subscription-actions { gap: 6px; margin: 9px 0; }
+.subscription-actions .button { padding: 8px 10px; font-size: 10px; }
+.subscription-panel details { padding: 8px 0; font-size: 11px; }
+.subscription-panel details summary { font-size: 11px; }
+.subscription-guide { padding-top: 8px; }
+.subscription-guide select { padding: 8px; font-size: 11px; }
+.subscription-guide ol { font-size: 11px; line-height: 1.45; }
+.subscription-guide .duplicate-choice { margin: 10px 0 6px; }
+
+@media (max-width: 760px) {
+  .living-layout { gap: 16px; padding-top: 12px; }
+  .living-settings, .subscription-panel { padding: 14px; }
+}
