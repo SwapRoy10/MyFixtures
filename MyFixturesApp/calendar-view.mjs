@@ -1,6 +1,6 @@
 import { localDate, gamePhase, competitionName, competitionKey, confirmedOpponent } from './schedule-common.mjs';
 export { gamePhase, competitionName, competitionKey };
-export const gameMinutes = sport => ['mlb', 'nfl'].includes(sport) ? 180 : ['nba', 'nhl'].includes(sport) ? 150 : 120;
+export const gameMinutes = (sport, sessionType = 'race') => sport === 'f1' ? ({ qualifying: 60, sprint: 45, 'sprint-qualifying': 45 }[sessionType] || 120) : ['mlb', 'nfl'].includes(sport) ? 180 : ['nba', 'nhl'].includes(sport) ? 150 : 120;
 export function dateKey(value, timeZone) {
   return localDate(value, timeZone);
 }
@@ -9,7 +9,7 @@ export function conflictKeys(games) {
   const active = games.filter(g => !g.timeTbd && confirmedOpponent(g) && !/cancel|abandon|postpon|suspend|^ppd$|^cncl$/i.test(g.status || '')).toSorted((a, b) => Date.parse(a.utcDate) - Date.parse(b.utcDate));
   const conflicts = new Set();
   for (let i = 0; i < active.length; i++) {
-    const end = Date.parse(active[i].utcDate) + gameMinutes(active[i].sport) * 60000;
+    const end = Date.parse(active[i].utcDate) + gameMinutes(active[i].sport, active[i].sessionType) * 60000;
     for (let j = i + 1; j < active.length && Date.parse(active[j].utcDate) < end; j++) {
       if (active[i].key !== active[j].key) { conflicts.add(active[i].key); conflicts.add(active[j].key); }
     }
@@ -41,7 +41,7 @@ export function groupWeekSeries(games) {
 export function googleGameUrl(game, now = Date.now()) {
   if (game.timeTbd || !confirmedOpponent(game) || /cancel|abandon|postpon|suspend|^ppd$|^cncl$/i.test(game.status || '') || Date.parse(game.utcDate) <= now) return null;
   const stamp = value => new Date(value).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
-  const query = new URLSearchParams({ action: 'TEMPLATE', text: `${game.title} - ${game.competition}`, dates: `${stamp(game.utcDate)}/${stamp(Date.parse(game.utcDate) + gameMinutes(game.sport) * 60000)}`, details: `One-time copy. ${game.competition}. Duration estimated at ${gameMinutes(game.sport)} minutes.`, location: game.venue || '' });
+  const query = new URLSearchParams({ action: 'TEMPLATE', text: `${game.title} - ${game.competition}`, dates: `${stamp(game.utcDate)}/${stamp(Date.parse(game.utcDate) + gameMinutes(game.sport, game.sessionType) * 60000)}`, details: `One-time copy. ${game.competition}. Duration estimated at ${gameMinutes(game.sport, game.sessionType)} minutes.`, location: game.venue || '' });
   return `https://calendar.google.com/calendar/render?${query}`;
 }
 

@@ -792,7 +792,7 @@ async function getF1Pages(endpoint, query, env) {
     if (!result.ok) {
       const providerMessage = result.payload?.message || result.payload?.error;
       const error = new Error(result.status === 401 || result.status === 403
-        ? 'F1 access denied. Check BALLDONTLIE_API_KEY and F1 ALL-STAR or GOAT access for race times.'
+        ? 'F1 access denied. Check BALLDONTLIE_API_KEY and F1 ALL-STAR or GOAT access for session times.'
         : result.status === 429
           ? 'BALLDONTLIE F1 rate limit reached. Please try again shortly.'
           : `BALLDONTLIE F1 schedule request failed (${result.status})${providerMessage ? `: ${providerMessage}` : '.'}`);
@@ -822,24 +822,31 @@ async function getJolpicaF1Fixtures(dateFrom, dateTo) {
     throw new Error('Jolpica returned an invalid F1 schedule response');
   }
   return payloads.flatMap(payload => payload.MRData.RaceTable.Races)
-    .filter(race => race.date >= dateFrom && race.date <= dateTo)
-    .map(race => {
-      const time = race.time || '12:00:00Z';
-      return {
-        id: `f1-jolpica-${race.season}-${race.round}`,
-        sport: 'f1',
-        utcDate: `${race.date}T${time}`,
-        timeTbd: !race.time,
-        opponent: race.raceName || 'Grand Prix',
-        title: `${race.raceName || 'Grand Prix'} - Race`,
-        venue: race.Circuit?.circuitName || '',
-        competition: 'Formula 1',
-        status: 'scheduled',
-        provider: 'jolpica'
-      };
-    })
+    .flatMap(race => [
+      ['qualifying', 'Qualifying', race.Qualifying],
+      ['sprint-qualifying', 'Sprint Qualifying', race.SprintQualifying || race.SprintShootout],
+      ['sprint', 'Sprint', race.Sprint],
+      ['race', 'Race', race]
+    ].flatMap(([sessionType, label, session]) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(session?.date || '') || session.date < dateFrom || session.date > dateTo) return [];
+      const utcDate = `${session.date}T${session.time || '12:00:00Z'}`;
+      if (!Number.isFinite(Date.parse(utcDate))) return [];
+      return [{
+        id: `f1-jolpica-${race.season}-${race.round}${sessionType === 'race' ? '' : `-${sessionType}`}`,
+        sport: 'f1', sessionType, utcDate, scheduledDate: session.date, timeTbd: !session.time,
+        opponent: race.raceName || 'Grand Prix', title: `${race.raceName || 'Grand Prix'} - ${label}`,
+        venue: race.Circuit?.circuitName || '', competition: 'Formula 1', status: 'scheduled', provider: 'jolpica'
+      }];
+    }))
     .sort((a, b) => a.utcDate.localeCompare(b.utcDate));
 }
+
+function f1SessionType(value) {
+  const type = String(value || '').toLowerCase().replace(/[^a-z]/g, '');
+  return { race: 'race', qualifying: 'qualifying', sprint: 'sprint', sprintrace: 'sprint', sprintqualifying: 'sprint-qualifying', sprintshootout: 'sprint-qualifying' }[type];
+}
+
+const f1SessionLabel = { race: 'Race', qualifying: 'Qualifying', sprint: 'Sprint', 'sprint-qualifying': 'Sprint Qualifying' };
 
 async function getF1Fixtures(url, env) {
   const year = new Date().getUTCFullYear();
@@ -866,13 +873,14 @@ async function getF1Fixtures(url, env) {
     const upcoming = events.filter(event => event.start_date?.slice(0, 10) <= dateTo && (event.end_date || event.start_date)?.slice(0, 10) >= dateFrom);
     const sessions = [];
     for (let offset = 0; offset < upcoming.length; offset += 20) {
-      const query = new URLSearchParams({ type: 'Race' });
+      const query = new URLSearchParams();
       upcoming.slice(offset, offset + 20).forEach(event => query.append('event_ids[]', String(event.id)));
       sessions.push(...await getF1Pages('sessions', query, env));
     }
-    const fixtures = [...new Map(sessions.filter(session => session.type === 'Race' && session.date && Number.isFinite(Date.parse(session.date)) && session.date.slice(0, 10) >= dateFrom && session.date.slice(0, 10) <= dateTo && !excluded.has(String(session.status_state || session.status).toLowerCase())).map(session => {
+    const fixtures = [...new Map(sessions.filter(session => f1SessionType(session.type) && session.date && Number.isFinite(Date.parse(session.date)) && session.date.slice(0, 10) >= dateFrom && session.date.slice(0, 10) <= dateTo && !excluded.has(String(session.status_state || session.status).toLowerCase())).map(session => {
       const event = session.event || upcoming.find(event => event.id === session.event_id) || {};
-      return [session.id, { id: `f1-${session.id}`, sport: 'f1', utcDate: session.date, opponent: event.name || 'Grand Prix', title: `${event.name || 'Grand Prix'} - Race`, venue: event.circuit?.name || event.location || '', competition: 'Formula 1', status: session.status_state || session.status || 'unknown', provider: 'balldontlie' }];
+      const sessionType = f1SessionType(session.type);
+      return [session.id, { id: `f1-${session.id}`, sport: 'f1', sessionType, utcDate: session.date, scheduledDate: session.date.slice(0, 10), opponent: event.name || 'Grand Prix', title: `${event.name || 'Grand Prix'} - ${f1SessionLabel[sessionType]}`, venue: event.circuit?.name || event.location || '', competition: 'Formula 1', status: session.status_state || session.status || 'unknown', provider: 'balldontlie' }];
     })).values()].sort((a, b) => a.utcDate.localeCompare(b.utcDate));
     return new Response(JSON.stringify({ fixtures, results: fixtures.length, provider: 'balldontlie' }), { headers: jsonHeaders });
   } catch (error) {

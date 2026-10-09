@@ -10,7 +10,7 @@ const token = () => [...crypto.getRandomValues(new Uint8Array(16))].map(byte => 
 export const teamKey = team => `${team.sport}:${team.id}`;
 export const cancelled = fixture => /cancel|abandon|^cncl$/i.test(fixture.status || '');
 export const postponed = fixture => /postpon|suspend|^ppd$|^susp$/i.test(fixture.status || '');
-export const duration = sport => ['nfl', 'mlb'].includes(sport) ? 180 : ['nba', 'nhl'].includes(sport) ? 150 : 120;
+export const duration = (sport, sessionType = 'race') => sport === 'f1' ? ({ qualifying: 60, sprint: 45, 'sprint-qualifying': 45 }[sessionType] || 120) : ['nfl', 'mlb'].includes(sport) ? 180 : ['nba', 'nhl'].includes(sport) ? 150 : 120;
 
 export function validateConfig(input) {
   if (!input || !Array.isArray(input.teams) || !input.teams.length || input.teams.length > 12) throw fail('Choose between 1 and 12 teams or championships.');
@@ -130,7 +130,7 @@ export function included(game, config, now = Date.now()) {
   const range = seasonRange(game.sport, now);
   const date = game.scheduledDate || game.utcDate.slice(0, 10);
   if (date < range.from || date > range.to) return false;
-  if (!config.includeCompleted && Date.parse(game.utcDate) + duration(game.sport) * 60000 < now && !game.timeTbd) return false;
+  if (!config.includeCompleted && Date.parse(game.utcDate) + duration(game.sport, game.sessionType) * 60000 < now && !game.timeTbd) return false;
   if (!config.includeCompleted && game.timeTbd && date < localDate(now, config.timeZone)) return false;
   return true;
 }
@@ -146,9 +146,9 @@ export function reconcileEvents(previous, games, config, now = Date.now()) {
   for (const game of games.filter(game => included(game, config, now))) {
     if (game.timeTbd || postponed(game) || !confirmedOpponent(game)) continue;
     eligible.add(game.key);
-    const content = { title: `${game.title} - ${game.competition}`, start: game.utcDate, end: new Date(Date.parse(game.utcDate) + duration(game.sport) * 60000).toISOString(),
+    const content = { title: `${game.title} - ${game.competition}`, start: game.utcDate, end: new Date(Date.parse(game.utcDate) + duration(game.sport, game.sessionType) * 60000).toISOString(),
       venue: game.venue || '', status: cancelled(game) ? 'CANCELLED' : 'CONFIRMED', reminder: config.reminder,
-      description: `${game.competition}. ${game.changeNote || ''} Calendar duration is estimated at ${duration(game.sport)} minutes.`.trim() };
+      description: `${game.competition}. ${game.changeNote || ''} Calendar duration is estimated at ${duration(game.sport, game.sessionType)} minutes.`.trim() };
     if (content.status !== 'CANCELLED' || previous[game.key]) update(game.key, content);
   }
   for (const [key, old] of Object.entries(previous)) {

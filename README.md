@@ -23,7 +23,7 @@ MyFixtures is a responsive sports schedule website for following soccer clubs, N
 - View full-season schedules, including completed events.
 - Browse remaining MLB games in series cards with Game 1, Game 2, and later-game tabs.
 - Add one MLB game, an entire series, or all remaining games to Google Calendar.
-- Follow Formula 1 Grand Prix races for the current calendar year.
+- Follow Formula 1 races, qualifying, sprint races, and sprint qualifying for the current calendar year when their schedules are published.
 - Convert kickoff and race times to Eastern, Central, Mountain, Pacific, or British time.
 - Download one event or a complete schedule as an `.ics` calendar file.
 - Add all confirmed upcoming events directly to Google Calendar.

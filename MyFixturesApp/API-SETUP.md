@@ -83,11 +83,11 @@ BALLDONTLIE makes the MLB Teams and Games endpoints available on its free tier, 
 
 ## Formula 1
 
-Choose Formula 1 in the sport selector to load the current calendar year's Grand Prix races. The schedule prefers the free Jolpica F1 race feed and falls back to BALLDONTLIE `/f1/v1/events?season=YEAR` and `/f1/v1/sessions?type=Race&event_ids[]=ID`, including cursor pagination. Practice, qualifying and sprint sessions are not included.
+Choose Formula 1 in the sport selector to load the current calendar year's Grand Prix weekends. The schedule prefers the free Jolpica F1 race feed, which publishes separate Race, Qualifying, Sprint and Sprint Qualifying (formerly Sprint Shootout) dates and times where available. Practice sessions are not included. If Jolpica is unavailable, the worker falls back to BALLDONTLIE `/f1/v1/events?season=YEAR` and `/f1/v1/sessions?event_ids[]=ID`, including cursor pagination, and keeps only those four session types. Sessions with no confirmed time remain visible as TBD but are excluded from calendar exports.
 
-`BALLDONTLIE_API_KEY` is optional while Jolpica is available. Its race session times require F1 ALL-STAR or GOAT access; an NFL subscription does not grant F1 access. See https://f1.balldontlie.io/#sessions. Errors are shown instead of substituting weekend start dates for race times. Calendar entries use an estimated two-hour duration.
+`BALLDONTLIE_API_KEY` is optional while Jolpica is available. Its session times require F1 ALL-STAR or GOAT access; an NFL subscription does not grant F1 access. See https://f1.balldontlie.io/#sessions. Errors are shown instead of substituting weekend start dates for session times. Calendar durations are estimated at two hours for races, one hour for qualifying, and 45 minutes for sprint and sprint qualifying.
 
-Test locally with `npm test`. For live development testing, configure `BALLDONTLIE_API_KEY` on `my-fixtures-api-development`, or in an untracked `.dev.vars` file for `npm run preview`. Select Formula 1 and check race titles, local times, and calendar exports. Do not deploy to the default production Worker when testing this change.
+Test locally with `npm test`. Select Formula 1 and check session titles, local times, and calendar exports. A BALLDONTLIE key is needed only to test its fallback. Do not deploy to the default production Worker when testing this change.
 
 The app uses a Cloudflare Worker so schedule provider tokens are never exposed in the browser.
 
