@@ -10,6 +10,11 @@ const teamSearchCacheTtl = 12 * 60 * 60;
 const fixtureCacheTtl = 60 * 60;
 const providerRosterCacheTtl = 12 * 60 * 60;
 const providerScheduleCacheTtl = 60 * 60;
+const publicAssetPaths = new Set([
+  '/', '/index.html', '/calendar.html', '/app.js', '/calendar-ui.mjs',
+  '/calendar-view.mjs', '/calendar-guides.mjs', '/schedule-common.mjs',
+  '/styles.css', '/theme.css', '/calendar.css', '/calendar-updates.css'
+]);
 const footballCompetitionCodes = ['PL', 'CL', 'EL', 'FAC', 'FLC', 'ELC', 'SA', 'PPL', 'DED', 'PD', 'CDR', 'BL1', 'DFB', 'FL1'];
 const footballRosterCompetitionCodes = ['PL', 'CL', 'ELC', 'SA', 'PPL', 'DED', 'PD', 'BL1', 'FL1'];
 const espnSoccerLeagues = [
@@ -153,8 +158,10 @@ async function getNbaPages(endpoint, query, env) {
   if (!env.BALLDONTLIE_API_KEY) throw Object.assign(new Error('BALLDONTLIE_API_KEY is required for NBA schedules.'), { status: 503 });
   const rows = [];
   const cursors = new Set();
+  let pages = 0;
   query.set('per_page', '100');
   while (true) {
+    if (++pages > 25) throw new Error('NBA schedule provider returned too many pages.');
     const result = await fetchProviderJson(`https://api.balldontlie.io/v1/${endpoint}?${query}`, { Authorization: env.BALLDONTLIE_API_KEY }, endpoint === 'teams' ? providerRosterCacheTtl : providerScheduleCacheTtl);
     if (!result.ok) {
       const message = result.status === 429 ? 'NBA schedule provider is busy. Please try again in a minute.'
@@ -163,6 +170,7 @@ async function getNbaPages(endpoint, query, env) {
       throw Object.assign(new Error(message), { status: result.status >= 400 ? result.status : 502 });
     }
     if (!Array.isArray(result.payload.data)) throw new Error('Invalid NBA schedule response.');
+    if (rows.length + result.payload.data.length > 2500) throw new Error('NBA schedule provider returned too many games.');
     rows.push(...result.payload.data);
     const cursor = result.payload.meta?.next_cursor;
     if (cursor == null) return rows;
@@ -323,10 +331,15 @@ function validateApiQuery(url) {
   if (url.search.length > 2048) return errorResponse('Query is too long.', 400);
   const sport = url.searchParams.get('sport') || 'soccer';
   if (!['soccer', 'nfl', 'mlb', 'nba', 'nhl', 'f1'].includes(sport)) return errorResponse('Unsupported sport.', 400);
+  if (url.searchParams.getAll('sport').length > 1) return errorResponse('Invalid sport.', 400);
   const limits = { search: 80, team: 32, teamName: 100, teamAbbreviation: 12, competitions: 160 };
   for (const [name, limit] of Object.entries(limits)) {
     if (url.searchParams.getAll(name).length > 1 || (url.searchParams.get(name) || '').length > limit) return errorResponse(`Invalid ${name}.`, 400);
   }
+  const team = url.searchParams.get('team');
+  if (url.pathname === '/api/fixtures' && team && sport !== 'f1' && !/^[1-9]\d{0,9}$/.test(team)) return errorResponse('Invalid team.', 400);
+  const abbreviation = url.searchParams.get('teamAbbreviation');
+  if (abbreviation && !/^[a-z0-9]{1,12}$/i.test(abbreviation)) return errorResponse('Invalid teamAbbreviation.', 400);
   for (const name of ['dateFrom', 'dateTo']) {
     const dates = url.searchParams.getAll(name);
     if (dates.length > 1 || (dates.length && (!/^\d{4}-\d{2}-\d{2}$/.test(dates[0]) || Number.isNaN(Date.parse(`${dates[0]}T00:00:00Z`)) || new Date(`${dates[0]}T00:00:00Z`).toISOString().slice(0, 10) !== dates[0]))) return errorResponse(`Invalid ${name}.`, 400);
@@ -334,6 +347,7 @@ function validateApiQuery(url) {
   const from = url.searchParams.get('dateFrom');
   const to = url.searchParams.get('dateTo');
   if (from && to && from > to) return errorResponse('Invalid date range.', 400);
+  if (from && to && Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`) > 731 * 86400000) return errorResponse('Date range is too long.', 400);
   return null;
 }
 
@@ -727,7 +741,7 @@ async function getNflFixtures(url, env) {
   query.append('season_type[]', '2');
   query.append('season_type[]', '3');
   const response = await fetch(`https://api.balldontlie.io/nfl/v1/games?${query}`, {
-    headers: { Authorization: env.BALLDONTLIE_API_KEY }
+    headers: { Authorization: env.BALLDONTLIE_API_KEY }, signal: AbortSignal.timeout(20000)
   });
   const payload = await response.json();
   if (!response.ok) return errorResponse(payload.error || 'BALLDONTLIE NFL schedule feed is unavailable.', response.status);
@@ -756,8 +770,10 @@ async function getNflFixtures(url, env) {
 async function getMlbPages(query, env) {
   const games = [];
   const cursors = new Set();
+  let pages = 0;
   query.set('per_page', '100');
   while (true) {
+    if (++pages > 25) throw new Error('MLB schedule provider returned too many pages.');
     const result = await fetchProviderJson(`https://api.balldontlie.io/mlb/v1/games?${query}`, { Authorization: env.BALLDONTLIE_API_KEY }, providerScheduleCacheTtl);
     if (!result.ok) {
       const providerMessage = result.payload?.message || result.payload?.error;
@@ -770,6 +786,7 @@ async function getMlbPages(query, env) {
       throw error;
     }
     if (!Array.isArray(result.payload.data)) throw new Error('Invalid MLB schedule response.');
+    if (games.length + result.payload.data.length > 2500) throw new Error('MLB schedule provider returned too many games.');
     games.push(...result.payload.data);
     const cursor = result.payload.meta?.next_cursor;
     if (cursor == null) return games;
@@ -830,8 +847,10 @@ async function getMlbFixtures(url, env, options = {}) {
 async function getF1Pages(endpoint, query, env) {
   const rows = [];
   const cursors = new Set();
+  let pages = 0;
   query.set('per_page', '100');
   while (true) {
+    if (++pages > 25) throw new Error('F1 schedule provider returned too many pages.');
     const result = await fetchProviderJson(`https://api.balldontlie.io/f1/v1/${endpoint}?${query}`, { Authorization: env.BALLDONTLIE_API_KEY }, providerScheduleCacheTtl);
     if (!result.ok) {
       const providerMessage = result.payload?.message || result.payload?.error;
@@ -844,6 +863,7 @@ async function getF1Pages(endpoint, query, env) {
       throw error;
     }
     if (!Array.isArray(result.payload.data)) throw new Error('Invalid F1 schedule response.');
+    if (rows.length + result.payload.data.length > 2500) throw new Error('F1 schedule provider returned too many records.');
     rows.push(...result.payload.data);
     const cursor = result.payload.meta?.next_cursor;
     if (cursor == null) return rows;
@@ -856,7 +876,7 @@ async function getF1Pages(endpoint, query, env) {
 async function getJolpicaF1Fixtures(dateFrom, dateTo) {
   const seasons = [...new Set([dateFrom.slice(0, 4), dateTo.slice(0, 4)])];
   const responses = await Promise.all(seasons.map(season => fetch(`https://api.jolpi.ca/ergast/f1/${season}/races/?limit=100`, {
-    headers: { 'User-Agent': 'MyFixtures/1.0' }
+    headers: { 'User-Agent': 'MyFixtures/1.0' }, signal: AbortSignal.timeout(20000)
   })));
   const payloads = await Promise.all(responses.map(async response => {
     if (!response.ok) throw new Error(`Jolpica F1 returned ${response.status}`);
@@ -955,6 +975,8 @@ async function routeAppRequest(request, env) {
     if (calendarResponse) return calendarResponse;
     const url = new URL(request.url);
     if (url.pathname !== '/api/fixtures' && url.pathname !== '/api/teams') {
+      if (!publicAssetPaths.has(url.pathname)) return errorResponse('Not found.', 404);
+      if (!['GET', 'HEAD'].includes(request.method)) return errorResponse('Method not allowed.', 405);
       const assetResponse = await env.ASSETS.fetch(request);
       const headers = new Headers(assetResponse.headers);
       headers.set('cache-control', 'no-store, no-cache, must-revalidate');

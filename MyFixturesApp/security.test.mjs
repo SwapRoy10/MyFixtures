@@ -4,7 +4,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 const workerSource = await readFile(new URL('./worker.js', import.meta.url), 'utf8');
-const workerModule = await import(`data:text/javascript;base64,${Buffer.from(workerSource.replace("'./living-calendar.mjs'", JSON.stringify(new URL('./living-calendar.mjs', import.meta.url).href)) + '\nexport { withApiCache };').toString('base64')}`);
+const workerModule = await import(`data:text/javascript;base64,${Buffer.from(workerSource.replace("'./living-calendar.mjs'", JSON.stringify(new URL('./living-calendar.mjs', import.meta.url).href)) + '\nexport { withApiCache, getNbaPages, getMlbPages, getF1Pages };').toString('base64')}`);
 
 test('HTTPS redirect and security headers cover static pages and API errors', async () => {
   const worker = workerModule.default;
@@ -21,6 +21,18 @@ test('HTTPS redirect and security headers cover static pages and API errors', as
   assert.equal(invalid.headers.get('x-frame-options'), 'DENY');
 });
 
+test('only declared public assets can be fetched from the asset binding', async () => {
+  let assetFetches = 0;
+  const env = { ASSETS: { fetch: async () => { assetFetches++; return new Response('asset'); } } };
+  const publicPaths = ['/', '/index.html', '/calendar.html', '/app.js', '/calendar-ui.mjs', '/calendar-view.mjs', '/calendar-guides.mjs', '/schedule-common.mjs', '/styles.css', '/theme.css', '/calendar.css', '/calendar-updates.css'];
+  for (const path of publicPaths) assert.equal((await workerModule.default.fetch(new Request(`https://example.test${path}`), env)).status, 200, path);
+  for (const path of ['/.gitignore', '/.dev.vars', '/package.json', '/worker.js', '/.wrangler/security-dry-run/worker.js.map']) {
+    assert.equal((await workerModule.default.fetch(new Request(`https://example.test${path}`), env)).status, 404, path);
+  }
+  assert.equal((await workerModule.default.fetch(new Request('https://example.test/', { method: 'POST' }), env)).status, 405);
+  assert.equal(assetFetches, publicPaths.length);
+});
+
 test('calendar write route remains available behind the shared security wrapper', async () => {
   let forwarded = false;
   const env = { CALENDARS: { idFromName: name => name, get: () => ({ fetch: async () => { forwarded = true; return Response.json({ id: 'saved' }, { status: 201 }); } }) } };
@@ -32,10 +44,31 @@ test('calendar write route remains available behind the shared security wrapper'
 
 test('API input bounds and duplicate query keys reject invalid requests', async () => {
   const worker = workerModule.default;
-  for (const query of ['sport=unknown', 'sport=nhl&search=x&search=y', 'sport=mlb&dateFrom=2026-02-30', 'sport=mlb&dateFrom=2026-10-01&dateTo=2026-09-01', `sport=nba&search=${'x'.repeat(81)}`]) {
+  for (const query of ['sport=unknown', 'sport=nhl&sport=nba', 'sport=nhl&search=x&search=y', 'sport=mlb&dateFrom=2026-02-30', 'sport=mlb&dateFrom=2026-10-01&dateTo=2026-09-01', 'sport=soccer&dateFrom=2026-01-01&dateTo=2030-01-01', 'sport=nfl&teamAbbreviation=../bad', `sport=nba&search=${'x'.repeat(81)}`]) {
     const response = await worker.fetch(new Request(`https://example.test/api/teams?${query}`), {});
     assert.equal(response.status, 400, query);
   }
+});
+
+test('provider pagination has a finite page budget', async () => {
+  globalThis.caches = { default: { match: async () => undefined, put: async () => {} } };
+  let page = 0;
+  globalThis.fetch = async () => Response.json({ data: [], meta: { next_cursor: String(++page) } });
+  const env = { BALLDONTLIE_API_KEY: 'test-only' };
+  for (const [loader, args] of [
+    [workerModule.getNbaPages, ['games', new URLSearchParams(), env]],
+    [workerModule.getMlbPages, [new URLSearchParams(), env]],
+    [workerModule.getF1Pages, ['events', new URLSearchParams(), env]]
+  ]) {
+    page = 0;
+    await assert.rejects(loader(...args), /too many pages/);
+    assert.equal(page, 25);
+  }
+});
+
+test('asset upload rules exclude local secret material', async () => {
+  const ignores = await readFile(new URL('./.assetsignore', import.meta.url), 'utf8');
+  for (const pattern of ['.dev.vars*', '.env', '.env.*', '.wrangler/', '*.pem', '*.key']) assert.ok(ignores.split(/\r?\n/).includes(pattern), pattern);
 });
 
 test('cache noise cannot evade miss limiter; cached API response remains available', async () => {

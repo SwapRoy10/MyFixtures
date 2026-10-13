@@ -1,4 +1,13 @@
 node_modules/
+.wrangler/
+.dev.vars*
+.env
+.env.*
+.gitignore
+*.pem
+*.key
+*.p12
+*.pfx
 scripts/
 *.test.mjs
 worker.js
