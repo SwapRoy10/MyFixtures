@@ -1,7 +1,7 @@
 name = "my-fixtures-api"
 main = "worker.js"
 compatibility_date = "2026-09-03"
-assets = { directory = ".", binding = "ASSETS" }
+assets = { directory = ".", binding = "ASSETS", run_worker_first = true }
 
 [[ratelimits]]
 name = "PUBLIC_API_RATE_LIMIT"
