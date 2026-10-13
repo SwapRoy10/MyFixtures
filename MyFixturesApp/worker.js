@@ -11,7 +11,7 @@ const fixtureCacheTtl = 60 * 60;
 const providerRosterCacheTtl = 12 * 60 * 60;
 const providerScheduleCacheTtl = 60 * 60;
 const publicAssetPaths = new Set([
-  '/', '/index.html', '/calendar.html', '/app.js', '/calendar-ui.mjs',
+  '/', '/index.html', '/calendar', '/calendar.html', '/app.js', '/calendar-ui.mjs',
   '/calendar-view.mjs', '/calendar-guides.mjs', '/schedule-common.mjs',
   '/styles.css', '/theme.css', '/calendar.css', '/calendar-updates.css'
 ]);
