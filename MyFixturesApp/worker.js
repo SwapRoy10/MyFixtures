@@ -40,6 +40,25 @@ const jsonHeaders = {
   'cache-control': 'public, max-age=900',
   'access-control-allow-origin': '*'
 };
+const contentSecurityPolicy = [
+  "default-src 'self'", "script-src 'self' https://accounts.google.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com",
+  "font-src 'self' https://fonts.gstatic.com data:", "img-src 'self' https: data:",
+  "connect-src 'self' https://accounts.google.com https://www.googleapis.com",
+  'frame-src https://accounts.google.com', "object-src 'none'", "base-uri 'none'",
+  "frame-ancestors 'none'", "form-action 'self'", 'upgrade-insecure-requests'
+].join('; ');
+
+function secureResponse(response) {
+  const headers = new Headers(response.headers);
+  headers.set('content-security-policy', contentSecurityPolicy);
+  headers.set('strict-transport-security', 'max-age=31536000');
+  headers.set('x-content-type-options', 'nosniff');
+  headers.set('x-frame-options', 'DENY');
+  headers.set('referrer-policy', 'no-referrer');
+  headers.set('permissions-policy', 'camera=(), microphone=(), geolocation=()');
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
 
 function nflLogoUrl(abbreviation) {
   return `https://a.espncdn.com/i/teamlogos/nfl/500/${abbreviation.toLowerCase()}.png`;
@@ -292,10 +311,30 @@ function errorResponse(message, status = 503) {
 
 function apiCacheKey(request) {
   const url = new URL(request.url);
-  url.searchParams.delete('_');
-  url.searchParams.delete('v');
-  url.searchParams.set('__cache_schema', '2');
+  const allowed = url.pathname === '/api/teams' ? ['sport', 'search'] : ['sport', 'team', 'teamName', 'teamAbbreviation', 'competitions', 'dateFrom', 'dateTo'];
+  const values = new URLSearchParams();
+  for (const name of allowed) if (url.searchParams.has(name)) values.set(name, url.searchParams.get(name));
+  values.set('__cache_schema', '3');
+  url.search = values.toString();
   return new Request(url.toString(), request);
+}
+
+function validateApiQuery(url) {
+  if (url.search.length > 2048) return errorResponse('Query is too long.', 400);
+  const sport = url.searchParams.get('sport') || 'soccer';
+  if (!['soccer', 'nfl', 'mlb', 'nba', 'nhl', 'f1'].includes(sport)) return errorResponse('Unsupported sport.', 400);
+  const limits = { search: 80, team: 32, teamName: 100, teamAbbreviation: 12, competitions: 160 };
+  for (const [name, limit] of Object.entries(limits)) {
+    if (url.searchParams.getAll(name).length > 1 || (url.searchParams.get(name) || '').length > limit) return errorResponse(`Invalid ${name}.`, 400);
+  }
+  for (const name of ['dateFrom', 'dateTo']) {
+    const dates = url.searchParams.getAll(name);
+    if (dates.length > 1 || (dates.length && (!/^\d{4}-\d{2}-\d{2}$/.test(dates[0]) || Number.isNaN(Date.parse(`${dates[0]}T00:00:00Z`)) || new Date(`${dates[0]}T00:00:00Z`).toISOString().slice(0, 10) !== dates[0]))) return errorResponse(`Invalid ${name}.`, 400);
+  }
+  const from = url.searchParams.get('dateFrom');
+  const to = url.searchParams.get('dateTo');
+  if (from && to && from > to) return errorResponse('Invalid date range.', 400);
+  return null;
 }
 
 function cacheableJsonResponse(response, ttlSeconds) {
@@ -309,7 +348,7 @@ function shouldCacheApiResponse(response) {
   return response.ok && response.headers.get('content-type')?.includes('application/json') && !response.headers.get('cache-control')?.includes('no-store');
 }
 
-async function withApiCache(request, ttlSeconds, handler) {
+async function withApiCache(request, env, ttlSeconds, handler) {
   if (request.method !== 'GET') return handler();
   const cache = caches.default;
   const key = apiCacheKey(request);
@@ -318,6 +357,11 @@ async function withApiCache(request, ttlSeconds, handler) {
     const headers = new Headers(cached.headers);
     headers.set('x-myfixtures-cache', 'HIT');
     return new Response(cached.body, { status: cached.status, statusText: cached.statusText, headers });
+  }
+  const clientIp = request.headers.get('cf-connecting-ip');
+  if (clientIp && env.PUBLIC_API_RATE_LIMIT) {
+    const { success } = await env.PUBLIC_API_RATE_LIMIT.limit({ key: `${new URL(request.url).host}:${clientIp}` });
+    if (!success) return new Response(JSON.stringify({ error: 'Too many requests. Please try again shortly.' }), { status: 429, headers: { ...jsonHeaders, 'cache-control': 'no-store', 'retry-after': '60' } });
   }
   const schedule = new URL(request.url).pathname === '/api/fixtures';
   const staleUrl = new URL(key.url); staleUrl.searchParams.set('__snapshot', 'last-good');
@@ -906,8 +950,7 @@ export class CalendarStore extends LivingCalendarStore {
   }
 }
 
-export default {
-  async fetch(request, env) {
+async function routeAppRequest(request, env) {
     const calendarResponse = routeCalendarRequest(request, env);
     if (calendarResponse) return calendarResponse;
     const url = new URL(request.url);
@@ -918,22 +961,36 @@ export default {
       return new Response(assetResponse.body, { status: assetResponse.status, headers });
     }
 
+    if (request.method !== 'GET') return errorResponse('Method not allowed.', 405);
+    const invalidQuery = validateApiQuery(url);
+    if (invalidQuery) return invalidQuery;
+
     const sport = url.searchParams.get('sport') || 'soccer';
     if (sport === 'nhl') {
-      return withApiCache(request, url.pathname === '/api/teams' ? teamSearchCacheTtl : fixtureCacheTtl,
+      return withApiCache(request, env, url.pathname === '/api/teams' ? teamSearchCacheTtl : fixtureCacheTtl,
         () => url.pathname === '/api/teams' ? searchNhlTeams(url) : getNhlFixtures(url));
     }
     if (sport === 'nba') {
-      return withApiCache(request, url.pathname === '/api/teams' ? teamSearchCacheTtl : fixtureCacheTtl,
+      return withApiCache(request, env, url.pathname === '/api/teams' ? teamSearchCacheTtl : fixtureCacheTtl,
         () => url.pathname === '/api/teams' ? searchNbaTeams(url, env) : getNbaFixtures(url, env));
     }
     if (sport === 'f1') {
       if (url.pathname === '/api/teams') return new Response(JSON.stringify([]), { headers: jsonHeaders });
-      return withApiCache(request, fixtureCacheTtl, () => getF1Fixtures(url, env));
+      return withApiCache(request, env, fixtureCacheTtl, () => getF1Fixtures(url, env));
     }
     if (url.pathname === '/api/teams') {
-      return withApiCache(request, teamSearchCacheTtl, () => sport === 'nfl' ? searchNflTeams(url, env) : sport === 'mlb' ? searchMlbTeams(url, env) : searchSoccerTeams(url, env));
+      return withApiCache(request, env, teamSearchCacheTtl, () => sport === 'nfl' ? searchNflTeams(url, env) : sport === 'mlb' ? searchMlbTeams(url, env) : searchSoccerTeams(url, env));
     }
-    return withApiCache(request, fixtureCacheTtl, () => sport === 'nfl' ? getNflFixtures(url, env) : sport === 'mlb' ? getMlbFixtures(url, env) : getSoccerFixtures(url, env));
+    return withApiCache(request, env, fixtureCacheTtl, () => sport === 'nfl' ? getNflFixtures(url, env) : sport === 'mlb' ? getMlbFixtures(url, env) : getSoccerFixtures(url, env));
+}
+
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    if (url.protocol === 'http:') {
+      url.protocol = 'https:';
+      return new Response(null, { status: 308, headers: { location: url.toString(), 'cache-control': 'no-store' } });
+    }
+    return secureResponse(await routeAppRequest(request, env));
   }
 };

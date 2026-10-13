@@ -59,8 +59,8 @@ function teamInitials(team) { return (team.abbreviation || team.name || 'TM').sp
 function teamMark(team, mini = false) {
   const teamSport = team.sport || currentSport;
   const crest = team.crest || (teamSport === 'nfl' && team.abbreviation ? nflLogoUrl(team.abbreviation) : teamSport === 'mlb' && team.abbreviation ? mlbLogoUrl(team.abbreviation) : null);
-  if (crest) return `<img class="${mini ? 'team-mini-crest' : 'club-mark'}" src="${crest}" alt="${team.name} logo">`;
-  return `<span class="${mini ? 'team-mini-initials' : 'team-initials'}" aria-hidden="true">${teamInitials(team)}</span>`;
+  if (crest && /^https:\/\//i.test(crest)) return `<img class="${mini ? 'team-mini-crest' : 'club-mark'}" src="${escapeHtml(crest)}" alt="${escapeHtml(team.name)} logo">`;
+  return `<span class="${mini ? 'team-mini-initials' : 'team-initials'}" aria-hidden="true">${escapeHtml(teamInitials(team))}</span>`;
 }
 function escapeHtml(value) { return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char])); }
 function fixtureTitle(fixture) { return fixture.title || (currentSport === 'f1' ? fixture.opponent : currentTeam.name + ' v ' + fixture.opponent + ' - ' + fixture.competition); }
@@ -472,7 +472,7 @@ function readSavedClubs() { return JSON.parse(localStorage.getItem('fixture-save
 function writeSavedClubs(clubs) { localStorage.setItem('fixture-saved-clubs', JSON.stringify(clubs)); }
 function renderSavedClubs() {
   const clubs = readSavedClubs().filter(team => (team.sport || 'soccer') === currentSport);
-  savedClubs.innerHTML = clubs.length ? clubs.map(team => `<div class="saved-club" data-team="${team.id}"><button class="saved-club-main" data-open-team="${team.id}">${teamMark(team, true)}${team.name}</button><button class="saved-club-remove" data-remove-team="${team.id}" type="button" aria-label="Remove ${team.name}">×</button></div>`).join('') : `<span class="timezone">No saved ${sportLabel()} teams yet</span>`;
+  savedClubs.innerHTML = clubs.length ? clubs.map(team => `<div class="saved-club" data-team="${escapeHtml(team.id)}"><button class="saved-club-main" data-open-team="${escapeHtml(team.id)}">${teamMark(team, true)}${escapeHtml(team.name)}</button><button class="saved-club-remove" data-remove-team="${escapeHtml(team.id)}" type="button" aria-label="Remove ${escapeHtml(team.name)}">×</button></div>`).join('') : `<span class="timezone">No saved ${sportLabel()} teams yet</span>`;
   savedClubs.querySelectorAll('[data-open-team]').forEach(button => button.addEventListener('click', () => selectTeam(clubs.find(team => String(team.id) === button.dataset.openTeam))));
   savedClubs.querySelectorAll('[data-remove-team]').forEach(button => button.addEventListener('click', event => { event.stopPropagation(); writeSavedClubs(readSavedClubs().filter(team => `${team.sport || 'soccer'}:${team.id}` !== `${currentSport}:${button.dataset.removeTeam}`)); renderSavedClubs(); }));
 }
@@ -485,9 +485,9 @@ async function searchTeams(event) {
     const response = await fetch(`/api/teams?sport=${encodeURIComponent(currentSport)}&search=${encodeURIComponent(search)}&_=${Date.now()}`);
     if (!response.ok) throw new Error((await response.json()).error || 'Team search unavailable');
     const teams = await response.json();
-    clubResults.innerHTML = teams.length ? teams.map(team => `<button class="club-result" data-team="${team.id}"><span class="club-result-main">${teamMark(team, true)}${team.name}</span><span>＋ Save</span></button>`).join('') : '<span class="timezone">No teams found</span>';
+    clubResults.innerHTML = teams.length ? teams.map(team => `<button class="club-result" data-team="${escapeHtml(team.id)}"><span class="club-result-main">${teamMark(team, true)}${escapeHtml(team.name)}</span><span>＋ Save</span></button>`).join('') : '<span class="timezone">No teams found</span>';
     clubResults.querySelectorAll('.club-result').forEach(button => button.addEventListener('click', () => selectTeam(teams.find(team => String(team.id) === button.dataset.team))));
-  } catch (error) { clubResults.innerHTML = `<span class="timezone">${error.message}</span>`; }
+  } catch (error) { clubResults.innerHTML = `<span class="timezone">${escapeHtml(error.message)}</span>`; }
 }
 async function selectTeam(team) {
   if (!team) return;

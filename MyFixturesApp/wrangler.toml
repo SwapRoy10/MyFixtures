@@ -3,6 +3,14 @@ main = "worker.js"
 compatibility_date = "2026-09-03"
 assets = { directory = ".", binding = "ASSETS" }
 
+[[ratelimits]]
+name = "PUBLIC_API_RATE_LIMIT"
+namespace_id = "1001"
+
+[ratelimits.simple]
+limit = 20
+period = 60
+
 [[durable_objects.bindings]]
 name = "CALENDARS"
 class_name = "CalendarStore"

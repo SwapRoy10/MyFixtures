@@ -201,19 +201,19 @@ test('API outage and unexpectedly empty responses retain a dated last-good snaps
   globalThis.caches = { default: { async match(key) { const row = cache.get(key.url); return row && row.until > clock ? row.response.clone() : undefined; }, async put(key, response) { const ttl = Number(response.headers.get('cache-control').match(/max-age=(\d+)/)?.[1] || 0); cache.set(key.url, { response: response.clone(), until: clock + ttl * 1000 }); } } };
   const request = new Request('https://test/api/fixtures?sport=mlb&team=19&dateFrom=2026-01-01&dateTo=2026-12-31');
   const good = () => Response.json({ fixtures: [game()], results: 1 });
-  const first = await (await worker.withApiCache(request, 3600, good)).json(); assert.equal(first.health.state, 'current');
+  const first = await (await worker.withApiCache(request, {}, 3600, good)).json(); assert.equal(first.health.state, 'current');
   clock += 3600001;
   for (const handler of [() => Response.json({ error: 'limit' }, { status: 429 }), () => Response.json({ fixtures: [] }), () => Response.json({ fixtures: [], errors: { provider: 'unavailable' } }), () => Response.json({ fixtures: [], coverage: 'partial' }), () => { throw new Error('offline'); }]) {
-    const r = await worker.withApiCache(request, 3600, handler), body = await r.json();
+    const r = await worker.withApiCache(request, {}, 3600, handler), body = await r.json();
     assert.equal(r.status, 200); assert.equal(r.headers.get('cache-control'), 'no-store'); assert.equal(body.health.state, 'stale');
     assert.equal(body.health.updated, first.health.updated); assert.equal(body.fixtures.length, 1);
   }
   const other = new Request('https://test/api/fixtures?sport=mlb&team=20');
-  assert.equal((await worker.withApiCache(other, 3600, () => Response.json({ error: 'offline' }, { status: 502 }))).status, 502);
-  const partial = await worker.withApiCache(other, 3600, () => Response.json({ fixtures: [game()], coverage: 'partial' }));
+  assert.equal((await worker.withApiCache(other, {}, 3600, () => Response.json({ error: 'offline' }, { status: 502 }))).status, 502);
+  const partial = await worker.withApiCache(other, {}, 3600, () => Response.json({ fixtures: [game()], coverage: 'partial' }));
   assert.equal(partial.headers.get('cache-control'), 'no-store');
   assert.equal((await partial.json()).health.state, 'partial');
-  assert.equal((await worker.withApiCache(other, 3600, () => Response.json({ error: 'offline' }, { status: 502 }))).status, 502);
+  assert.equal((await worker.withApiCache(other, {}, 3600, () => Response.json({ error: 'offline' }, { status: 502 }))).status, 502);
 });
 
 test('Primary browser keeps real fixtures on failures and never substitutes sample Arsenal games', async () => {
