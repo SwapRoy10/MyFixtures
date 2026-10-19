@@ -125,7 +125,8 @@ See [API-SETUP.md](MyFixturesApp/API-SETUP.md) for provider and Google Calendar 
 |-- .github/workflows/deploy.yml
 |-- MyFixturesApp/
 |   |-- index.html
-|   |-- styles.css
+|   |-- calendar.html
+|   |-- app.css          (all page styles)
 |   |-- app.js
 |   |-- worker.js
 |   |-- fixtures.test.mjs

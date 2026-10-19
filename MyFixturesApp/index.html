@@ -4,58 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Fixture | Arsenal calendar</title>
-  <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="calendar.css">
-  <style>
-    .crest { background: transparent; clip-path: none; transform: none; width: 240px; height: 240px; margin-right: 4%; }
-    .crest img { width: 200px; height: 200px; transform: none; }
-    .club-mark { display: inline-block; width: 30px; height: 30px; background: transparent; border-radius: 0; object-fit: contain; vertical-align: middle; }
-    .club-mark[alt="Formula 1 logo"] { width: 30px; height: 30px; object-fit: contain; }
-    @media (max-width: 700px) {
-      .crest { width: 150px; height: 170px; margin-right: 0; }
-      .crest img { width: 125px; height: 125px; }
-    }
-    .club-switcher { min-width: 360px; }
-    .club-search { display: flex; gap: 8px; margin: 18px 0; }
-    .club-search input { margin: 0; }
-    .club-results, .saved-clubs { display: grid; gap: 8px; }
-    .club-result, .saved-club { border: 1px solid var(--line); background: #fff; padding: 12px; display: flex; align-items: center; justify-content: space-between; text-align: left; cursor: pointer; }
-    .club-result:hover, .saved-club:hover { border-color: var(--red); }
-    .saved-club-main { border: 0; background: transparent; color: var(--ink); font: inherit; cursor: pointer; padding: 0; }
-    .saved-club-remove { border: 0; background: transparent; color: var(--red); font-size: 20px; line-height: 1; cursor: pointer; padding: 2px 6px; }
-    .saved-club-remove:hover { color: var(--ink); }
-    .club-result-main, .saved-club-main { display: flex; align-items: center; gap: 10px; }
-    .team-mini-crest { width: 28px; height: 28px; object-fit: contain; }
-    .saved-heading { margin: 20px 0 8px; font: 11px 'DM Mono', monospace; color: var(--muted); text-transform: uppercase; }
-    .club-switcher .button { white-space: nowrap; }
-    .brand-group { display: flex; align-items: center; gap: 18px; }
-    .sport-select { border: 0; border-left: 1px solid var(--line); background: transparent; color: var(--muted); padding: 3px 0 3px 18px; min-width: 88px; font: 11px 'DM Mono', monospace; text-transform: uppercase; letter-spacing: .05em; cursor: pointer; outline-color: var(--red); }
-    .sport-select:hover, .sport-select:focus { color: var(--ink); }
-    .team-initials { display: inline-grid; place-items: center; width: 30px; height: 30px; background: var(--ink); color: #fff; font: 11px 'DM Mono', monospace; vertical-align: middle; margin-right: 9px; }
-    .team-mini-initials { display: inline-grid; place-items: center; width: 28px; height: 28px; background: var(--ink); color: #fff; font: 10px 'DM Mono', monospace; }
-    .team-mini-crest, .club-result .team-mini-crest, .saved-club .team-mini-crest { width: 30px; height: 30px; object-fit: contain; flex: 0 0 30px; }
-    .fixture-past { opacity: .48; filter: grayscale(1); }
-    .fixture-past .opponent, .fixture-past .fixture-meta b { color: var(--muted); }
-    .fixture-add-disabled, .fixture-add-disabled:hover { background: var(--line); color: var(--muted); cursor: not-allowed; transform: none; }
-    @media (max-width: 700px) {
-      .club-switcher { min-width: 0; }
-      .brand-group { gap: 10px; }
-      .sport-select { min-width: 74px; padding-left: 10px; }
-      .topbar { height: auto; min-height: 82px; flex-wrap: wrap; gap: 16px; padding: 18px 0; }
-      .topbar-meta { flex-wrap: wrap; gap: 8px; }
-      .topbar-meta .live-dot { margin-right: 0; }
-      .fixture, .fixture.series-game { grid-template-columns: 63px minmax(0, 1fr); padding: 16px 0; }
-      .fixture > * { min-width: 0; overflow-wrap: anywhere; }
-      .fixture-date { align-self: start; grid-row: 1 / span 2; }
-      .fixture-add { grid-column: 2; grid-row: auto; justify-self: start; }
-      .series-heading { flex-wrap: wrap; gap: 12px; }
-    }
-  </style>
-  <link rel="stylesheet" href="theme.css?v=20260929-compact-week">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-  <link rel="stylesheet" href="modern.css?v=20261019-modern">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Inter:wght@400..900&display=swap">
+  <link rel="stylesheet" href="app.css?v=20261019-consolidated">
 </head>
-<body>
+<body class="page-fixtures">
   <main class="shell">
     <header class="topbar">
       <div class="brand-group"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">MF</span>MyFixtures<span class="brand-edition">Edition</span></a><div class="sport-menu-wrap"><select class="sport-select" id="sport-select" aria-label="Choose sport" tabindex="-1" aria-hidden="true"><option value="soccer">Soccer</option><option value="nfl">NFL</option><option value="mlb">MLB</option><option value="nba">NBA</option><option value="nhl">NHL</option><option value="f1">Formula 1</option></select><button id="sport-menu-button" class="sport-menu-button" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="sport-menu"><span class="sport-menu-prefix">Sport:</span><span id="sport-menu-label">Soccer</span><span class="sport-menu-chevron" aria-hidden="true">⌄</span></button><div id="sport-menu" class="sport-menu" role="listbox" aria-label="Choose sport" inert><button type="button" role="option" data-sport-value="soccer">Soccer</button><button type="button" role="option" data-sport-value="nfl">NFL</button><button type="button" role="option" data-sport-value="mlb">MLB</button><button type="button" role="option" data-sport-value="nba">NBA</button><button type="button" role="option" data-sport-value="nhl">NHL</button><button type="button" role="option" data-sport-value="f1">Formula 1</button></div></div></div>
@@ -102,7 +56,7 @@
 
     <footer><span>MyFixtures</span><span>Built for matchday people</span></footer>
   </main>
-  <nav class="mobile-bottom-nav" aria-label="Mobile navigation"><a href="/" aria-current="page"><span class="material-symbols-outlined" aria-hidden="true">event</span>Fixtures</a><a href="/calendar.html#week-title"><span class="material-symbols-outlined" aria-hidden="true">view_week</span>My Week</a><a href="/calendar.html#settings-title"><span class="material-symbols-outlined" aria-hidden="true">calendar_month</span>Calendar</a></nav>
+  <nav class="mobile-bottom-nav" aria-label="Mobile navigation"><a href="/" aria-current="page"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/><rect x="13" y="13" width="4" height="4" rx="1" fill="currentColor" stroke="none"/></svg>Fixtures</a><a href="/calendar.html#week-title"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M9.2 4.5v15M14.8 4.5v15"/></svg>My Week</a><a href="/calendar.html#settings-title"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/><path d="M7.5 13h.01M12 13h.01M16.5 13h.01M7.5 16.5h.01M12 16.5h.01"/></svg>Calendar</a></nav>
 
   <dialog id="fixture-dialog">
     <form method="dialog" id="fixture-form">
