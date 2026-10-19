@@ -1785,9 +1785,6 @@ input,
   font-size: 10px;
   font-weight: 800;
 }
-.pulse-rule {
-  margin: 17px 0 12px;
-}
 .season-pulse p {
   min-height: 0;
   font-weight: 700;
@@ -2945,6 +2942,7 @@ body {
 .subscription-panel input[readonly] {
   width: 100%;
   padding: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 10px;
 }
 .subscription-actions {
@@ -3260,20 +3258,6 @@ dialog h2,
 .season-pulse strong {
   font: 800 60px/1 var(--display);
   letter-spacing: -0.05em;
-}
-.pulse-rule {
-  height: 8px;
-  border-radius: var(--r-pill);
-  background: var(--surface-mid);
-  position: relative;
-  overflow: hidden;
-}
-.pulse-rule::before {
-  content: "";
-  position: absolute;
-  inset: 0 28% 0 0;
-  border-radius: inherit;
-  background: var(--grad-red);
 }
 .season-pulse p {
   font-size: 13px;
@@ -3945,4 +3929,203 @@ select:focus {
   .button:hover {
     transform: none;
   }
+}
+
+/* ===== Next up card, earlier-games fold (Fixtures page) ===== */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+  gap: 48px;
+  align-items: center;
+  padding: 56px 0 44px;
+}
+.hero h1 {
+  font-size: clamp(48px, 5.6vw, 84px);
+}
+.next-up {
+  display: flex;
+  flex-direction: column;
+  width: auto;
+  min-width: 0;
+  padding: 26px;
+}
+.next-up .pulse-top {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.next-up .pulse-top span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.next-up .pulse-top span:first-child::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--grad-red);
+}
+.season-pulse .next-up-competition {
+  min-height: 0;
+  margin: 20px 0 8px;
+  color: var(--deep-red);
+  font: 700 11px Inter, system-ui, sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.next-up-opponent {
+  margin: 0;
+  font: 800 clamp(26px, 2.4vw, 32px) / 1.08 var(--display);
+  letter-spacing: -0.035em;
+  overflow-wrap: anywhere;
+}
+.season-pulse .next-up-when {
+  min-height: 0;
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.next-up-countdown {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 22px 0 18px;
+  padding: 14px 16px;
+  border-radius: var(--r-md);
+  background: var(--surface-low);
+}
+.next-up-countdown strong {
+  margin: 0;
+  font: 800 34px / 1 var(--display);
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+.next-up-countdown .pulse-caption {
+  color: var(--muted);
+  font: 600 12px Inter, system-ui, sans-serif;
+}
+.next-up-add {
+  justify-content: center;
+  width: 100%;
+}
+.next-up-add:disabled {
+  background: var(--surface-mid);
+  color: var(--muted);
+  box-shadow: none;
+  cursor: not-allowed;
+  transform: none;
+}
+.next-up small {
+  margin-top: 12px;
+  color: var(--muted);
+  font: 500 11px Inter, system-ui, sans-serif;
+  text-align: center;
+}
+
+.earlier-fixtures {
+  margin: 0 0 6px;
+  border: 1px dashed #ded7ce;
+  border-radius: var(--r-md);
+  background: rgb(255 255 255 / 0.45);
+}
+.earlier-fixtures > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  color: var(--muted);
+  font: 600 13px Inter, system-ui, sans-serif;
+  cursor: pointer;
+  list-style: none;
+  border-radius: inherit;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+.earlier-fixtures > summary::-webkit-details-marker {
+  display: none;
+}
+.earlier-fixtures > summary span::before {
+  content: "›";
+  display: inline-block;
+  width: 14px;
+  color: var(--red);
+  font-size: 17px;
+  transition: transform 0.2s var(--ease);
+}
+.earlier-fixtures[open] > summary span::before {
+  transform: rotate(90deg);
+}
+.earlier-fixtures > summary:hover {
+  color: var(--ink);
+  background: white;
+}
+.earlier-fixtures > summary small {
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  background: var(--surface-mid);
+  font: 600 11px Inter, system-ui, sans-serif;
+}
+.earlier-list {
+  display: grid;
+  gap: 10px;
+  padding: 0 12px 12px;
+}
+
+@media (max-width: 1050px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr) minmax(290px, 340px);
+    gap: 28px;
+  }
+}
+@media (max-width: 760px) {
+  .hero {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 0;
+  }
+  .season-pulse.next-up {
+    display: flex;
+    order: -1;
+    padding: 20px;
+  }
+  .next-up-countdown {
+    margin: 16px 0 14px;
+    padding: 12px 14px;
+  }
+  .next-up-countdown strong {
+    font-size: 28px;
+  }
+  .next-up-opponent {
+    font-size: 24px;
+  }
+  .hero h1 {
+    font-size: clamp(32px, 9vw, 42px);
+  }
+  .earlier-fixtures > summary {
+    padding: 13px 14px;
+  }
+  .earlier-list {
+    padding: 0 8px 8px;
+  }
+}
+.earlier-list .ledger-columns {
+  display: none;
+}
+.earlier-list .month-divider {
+  padding: 8px 6px 0;
+  color: var(--muted);
+  font-size: 15px;
 }

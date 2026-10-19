@@ -1,5 +1,6 @@
 const fixtures = [];
-let activeFixtureFilter = 'all';
+let activeFixtureFilter = 'upcoming';
+let nextUpFixture = null;
 let followedSlate = null;
 let followedSlateState = 'selected';
 let followedSlateLoadId = 0;
@@ -279,6 +280,16 @@ function activateSeriesTab(tab) {
   card.querySelectorAll('.series-tab').forEach(button => { button.setAttribute('aria-selected', String(button === tab)); button.tabIndex = button === tab ? 0 : -1; });
   card.querySelectorAll('[role="tabpanel"]').forEach(panel => { panel.hidden = panel.id !== tab.getAttribute('aria-controls'); });
 }
+function fixtureCard(fixture, index) {
+  const display = fixtureDisplay(fixture);
+  const dateFormat = new Intl.DateTimeFormat('en-GB', { timeZone: selectedTimeZone, day: '2-digit', month: 'short' });
+  const dayFormat = new Intl.DateTimeFormat('en-GB', { timeZone: selectedTimeZone, weekday: 'short' });
+  const past = isPastFixture(fixture);
+  const kickoff = fixture.timeTbd ? 'TBD' : display.time;
+  const homeTeam = fixture.home ? currentTeam.name : fixture.opponent;
+  const awayTeam = fixture.home ? fixture.opponent : currentTeam.name;
+  return `<article class="fixture${past ? ' fixture-past' : ''}"><div class="fixture-date"><strong>${dateFormat.format(display.date)}</strong><small>${dayFormat.format(display.date)}</small><span class="fixture-kickoff">${kickoff}</span></div><div class="fixture-matchup">${index === 0 && !past ? '<span class="fixture-status">Next up</span>' : ''}<div class="opponent">${currentSport === 'f1' ? escapeHtml(fixtureTitle(fixture)) : `<span class="${fixture.home ? 'selected-team' : ''}">${escapeHtml(homeTeam)}</span><span class="matchup-vs">vs</span><span class="${fixture.home ? '' : 'selected-team'}">${escapeHtml(awayTeam)}</span>`}</div><div class="home-away">${currentSport === 'f1' ? f1SessionLabel(fixture) : fixture.neutralSite ? 'Neutral site' : fixture.home ? 'Home' : 'Away'} &middot; ${escapeHtml(fixture.competition)}</div></div><div class="fixture-meta">${fixture.venue && fixture.venue !== 'TBC' ? `<span class="venue-label">Venue</span><span>${escapeHtml(fixture.venue)}</span>` : '<span class="venue-label">Venue to be announced</span>'}</div>${fixtureActionButton(fixture, index)}</article>`;
+}
 function render() {
   renderSevenDaySlate();
   const orderedFixtures = fixtures.filter(fixture => matchesFixtureFilter(fixture)).sort((first, second) => (first.utcDate || first.date).localeCompare(second.utcDate || second.date));
@@ -294,18 +305,14 @@ function render() {
     const monthCounts = new Map();
     for (const fixture of orderedFixtures) { const month = fixtureMonth(fixture); monthCounts.set(month, (monthCounts.get(month) || 0) + 1); }
     let shownMonth = '';
-    list.innerHTML = orderedFixtures.map((fixture, index) => {
+    const groupedCards = (items, indexOf) => { let month = ''; return items.map(fixture => { const current = fixtureMonth(fixture); const heading = current !== month ? monthHeading(current, items.filter(item => fixtureMonth(item) === current).length, currentSport === 'f1' ? 'session' : 'fixture') : ''; month = current; return heading + fixtureCard(fixture, indexOf(fixture)); }).join(''); };
+    const earlier = activeFixtureFilter === 'upcoming' ? fixtures.filter(isPastFixture).sort((first, second) => fixtureSortTime(first) - fixtureSortTime(second)) : [];
+    const earlierFold = earlier.length ? `<details class="earlier-fixtures"${orderedFixtures.length ? '' : ' open'}><summary><span>Earlier this season</span><small>${earlier.length} ${currentSport === 'f1' ? 'completed' : 'played'}</small></summary><div class="earlier-list">${groupedCards(earlier, () => -1)}</div></details>` : '';
+    list.innerHTML = earlierFold + orderedFixtures.map((fixture, index) => {
     const month = fixtureMonth(fixture);
     const heading = month !== shownMonth ? monthHeading(month, monthCounts.get(month), currentSport === 'f1' ? 'session' : 'fixture') : '';
     shownMonth = month;
-    const display = fixtureDisplay(fixture);
-    const dateFormat = new Intl.DateTimeFormat('en-GB', { timeZone: selectedTimeZone, day: '2-digit', month: 'short' });
-    const dayFormat = new Intl.DateTimeFormat('en-GB', { timeZone: selectedTimeZone, weekday: 'short' });
-    const past = isPastFixture(fixture);
-    const kickoff = fixture.timeTbd ? 'TBD' : display.time;
-    const homeTeam = fixture.home ? currentTeam.name : fixture.opponent;
-    const awayTeam = fixture.home ? fixture.opponent : currentTeam.name;
-    return `${heading}<article class="fixture${past ? ' fixture-past' : ''}"><div class="fixture-date"><strong>${dateFormat.format(display.date)}</strong><small>${dayFormat.format(display.date)}</small><span class="fixture-kickoff">${kickoff}</span></div><div class="fixture-matchup">${index === 0 && !past ? '<span class="fixture-status">Next up</span>' : ''}<div class="opponent">${currentSport === 'f1' ? escapeHtml(fixtureTitle(fixture)) : `<span class="${fixture.home ? 'selected-team' : ''}">${escapeHtml(homeTeam)}</span><span class="matchup-vs">vs</span><span class="${fixture.home ? '' : 'selected-team'}">${escapeHtml(awayTeam)}</span>`}</div><div class="home-away">${currentSport === 'f1' ? f1SessionLabel(fixture) : fixture.neutralSite ? 'Neutral site' : fixture.home ? 'Home' : 'Away'} &middot; ${escapeHtml(fixture.competition)}</div></div><div class="fixture-meta">${fixture.venue && fixture.venue !== 'TBC' ? `<span class="venue-label">Venue</span><span>${escapeHtml(fixture.venue)}</span>` : '<span class="venue-label">Venue to be announced</span>'}</div>${fixtureActionButton(fixture, index)}</article>`;
+    return heading + fixtureCard(fixture, index);
     }).join('');
   }
   document.querySelector('#fixture-count').textContent = `${orderedFixtures.length} ${currentSport === 'f1' ? orderedFixtures.length === 1 ? 'session' : 'sessions' : orderedFixtures.length === 1 ? 'game' : 'games'} in this view`;
@@ -317,6 +324,12 @@ function render() {
   document.querySelector('#pulse-next').textContent = next
     ? `Next confirmed: ${currentSport === 'f1' ? fixtureTitle(next) : next.opponent} · ${new Intl.DateTimeFormat('en-US', { timeZone: selectedTimeZone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(fixtureSortTime(next)))}`
     : 'No confirmed upcoming start is currently published.';
+  nextUpFixture = next || null;
+  const nextWhen = next ? new Intl.DateTimeFormat('en-US', { timeZone: selectedTimeZone, weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(fixtureSortTime(next))) : '';
+  document.querySelector('#next-up-opponent').textContent = !next ? 'No confirmed game yet' : currentSport === 'f1' ? fixtureTitle(next) : `${next.home || next.neutralSite ? 'vs' : '@'} ${next.opponent}`;
+  document.querySelector('#next-up-competition').textContent = !next ? 'Check back when the schedule is published' : [currentSport === 'f1' ? f1SessionLabel(next) : next.neutralSite ? 'Neutral site' : next.home ? 'Home' : 'Away', next.competition].filter(Boolean).join(' · ');
+  document.querySelector('#next-up-when').textContent = next ? [nextWhen, next.venue && next.venue !== 'TBC' ? next.venue : ''].filter(Boolean).join(' · ') : '';
+  document.querySelector('#next-up-add').disabled = !next;
   document.querySelectorAll('.fixture-add[data-index]').forEach(button => button.addEventListener('click', () => openGoogleCalendar(orderedFixtures[button.dataset.index])));
   replayEntrance(list);
 }
@@ -491,7 +504,7 @@ async function searchTeams(event) {
 }
 async function selectTeam(team) {
   if (!team) return;
-  activeFixtureFilter = 'all';
+  activeFixtureFilter = 'upcoming';
   const normalizedTeam = { ...team, sport: team.sport || currentSport };
   const clubs = readSavedClubs().filter(saved => `${saved.sport || 'soccer'}:${saved.id}` !== `${normalizedTeam.sport}:${normalizedTeam.id}`);
   writeSavedClubs([normalizedTeam, ...clubs].slice(0, 12));
@@ -527,6 +540,7 @@ document.querySelector('#mobile-sync').addEventListener('click', event => addFix
 document.querySelector('#mobile-export').addEventListener('click', () => downloadCalendar(fixtures));
 document.querySelector('#mobile-add').addEventListener('click', () => document.querySelector('#fixture-dialog').showModal());
 document.querySelectorAll('[data-fixture-filter]').forEach(button => button.addEventListener('click', () => { activeFixtureFilter = button.dataset.fixtureFilter; render(); }));
+document.querySelector('#next-up-add').addEventListener('click', () => { if (nextUpFixture) openGoogleCalendar(nextUpFixture); });
 document.querySelector('#add-fixture').addEventListener('click', () => document.querySelector('#fixture-dialog').showModal());
 document.querySelector('#close-dialog').addEventListener('click', () => document.querySelector('#fixture-dialog').close());
 document.querySelector('#club-select').addEventListener('click', () => { renderSavedClubs(); clubDialog.showModal(); clubSearchInput.focus(); });
@@ -552,7 +566,7 @@ if (sportMenuButton?.classList && sportMenu?.classList) {
 }
 sportSelect.addEventListener('change', async () => {
   currentSport = sportSelect.value;
-  activeFixtureFilter = 'all';
+  activeFixtureFilter = 'upcoming';
   localStorage.setItem('fixture-sport', currentSport);
   const savedForSport = readSavedClubs().find(team => (team.sport || 'soccer') === currentSport);
   currentTeam = savedForSport || defaultTeamForSport(currentSport);
