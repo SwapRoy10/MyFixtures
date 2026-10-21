@@ -90,7 +90,6 @@ function setTeamHeader() {
   document.querySelector('.section-heading .eyebrow').textContent = isF1 ? new Date().getUTCFullYear() + ' Formula 1 season' : isMlb ? `${new Date().getUTCFullYear()} MLB season - today forward` : isNba || isNhl ? `${season.startYear}-${String(season.endYear).slice(-2)} ${sportLabel()} season` : `${season.label} season - July through June`;
   document.querySelector('.section-heading h2').textContent = isF1 ? 'Every Grand Prix.' : isMlb ? 'Every series. Every game.' : isNba || isNhl ? 'Every team. Every game.' : 'Every team. Every match.';
   document.querySelector('#fixture-time-label').textContent = isNhl ? 'Puck drop' : isNba ? 'Tipoff' : 'Kickoff';
-  document.title = 'MyFixtures | ' + currentTeam.name + ' calendar';
   document.querySelector('#club-name').textContent = currentTeam.name;
   teamMarkWrapper.innerHTML = teamMark(currentTeam);
 }

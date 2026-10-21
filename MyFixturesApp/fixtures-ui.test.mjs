@@ -49,6 +49,14 @@ test('Fixtures default to upcoming games and fold played games into "Earlier thi
   assert.equal(element('#fixture-list').innerHTML.match(/<article class="fixture/g).length, 4);
 });
 
+test('Page titles stay fixed: MyFixtures, and MyFixtures | Personal Calendar on My Week', async () => {
+  const page = name => readFile(new URL(`./${name}`, import.meta.url), 'utf8');
+  assert.match(await page('index.html'), /<title>MyFixtures<\/title>/);
+  assert.match(await page('calendar.html'), /<title>MyFixtures \| Personal Calendar<\/title>/);
+  assert.doesNotMatch(app, /document\.title\s*=/);
+  assert.doesNotMatch(await readFile(new URL('./calendar-ui.mjs', import.meta.url), 'utf8'), /document\.title\s*=/);
+});
+
 test('The fold opens by itself when a season has no upcoming games left', async () => {
   const { context, element } = loadApp([fixture('past-1', '2000-08-10T14:00:00Z')]);
   await vm.runInContext('loadLiveFixtures()', context);
