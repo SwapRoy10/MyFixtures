@@ -9,7 +9,8 @@
     "audit:seasons": "node scripts/audit-seasons.mjs",
     "deploy": "wrangler deploy",
     "preview": "wrangler dev",
-    "preview:stable": "node scripts/preview-stable.mjs"
+    "preview:stable": "node scripts/preview-stable.mjs",
+    "stamp": "node scripts/stamp-assets.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.149.0"

@@ -46,4 +46,8 @@ git push -u origin feature/my-change
 
 Open a pull request into `development` and test the development deployment. When it is ready, open a pull request from `development` into `main`. Merging that pull request deploys production.
 
+After editing `app.css`, `app.js` or `calendar-ui.mjs`, run `npm run stamp`. Browsers cache those files for a year under their `?v=` content hash, so the hash in each page must match; `npm test` fails if one is out of date.
+
+Dependabot opens weekly update pull requests against `development`. Merge them there, check the development site, then promote to `main` as usual.
+
 Never commit API keys, Google client secrets, `.dev.vars`, or `.env` files. The Google OAuth client ID is public; the Calendar permission still requires users to authorize the app.

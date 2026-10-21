@@ -970,6 +970,15 @@ export class CalendarStore extends LivingCalendarStore {
   }
 }
 
+// Pages reference app.css, app.js and calendar-ui.mjs with ?v=<content hash> (see scripts/stamp-assets.mjs),
+// so those URLs never change content and can be cached for a year. Everything else, including HTML and
+// unversioned module imports, revalidates on each use and is answered with a cheap 304 when unchanged.
+const versionedAssetPaths = new Set(['/app.css', '/app.js', '/calendar-ui.mjs']);
+function assetCacheControl(url, response) {
+  if (response.ok && versionedAssetPaths.has(url.pathname) && /^[a-f0-9]{10}$/.test(url.searchParams.get('v') || '')) return 'public, max-age=31536000, immutable';
+  return 'no-cache';
+}
+
 async function routeAppRequest(request, env) {
     const calendarResponse = routeCalendarRequest(request, env);
     if (calendarResponse) return calendarResponse;
@@ -979,7 +988,7 @@ async function routeAppRequest(request, env) {
       if (!['GET', 'HEAD'].includes(request.method)) return errorResponse('Method not allowed.', 405);
       const assetResponse = await env.ASSETS.fetch(request);
       const headers = new Headers(assetResponse.headers);
-      headers.set('cache-control', 'no-store, no-cache, must-revalidate');
+      headers.set('cache-control', assetCacheControl(url, assetResponse));
       return new Response(assetResponse.body, { status: assetResponse.status, headers });
     }
 

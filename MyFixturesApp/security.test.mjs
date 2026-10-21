@@ -33,6 +33,29 @@ test('only declared public assets can be fetched from the asset binding', async 
   assert.equal(assetFetches, publicPaths.length);
 });
 
+test('versioned CSS and JS are cached for a year; pages and unversioned files revalidate', async () => {
+  const env = { ASSETS: { fetch: async request => new URL(request.url).pathname === '/missing.js' ? new Response('x', { status: 404 }) : new Response('asset', { headers: { etag: '"abc"' } }) } };
+  const cacheFor = async path => (await workerModule.default.fetch(new Request(`https://example.test${path}`), env)).headers.get('cache-control');
+  for (const path of ['/app.css?v=0123456789', '/app.js?v=abcdef0123', '/calendar-ui.mjs?v=a1b2c3d4e5']) assert.equal(await cacheFor(path), 'public, max-age=31536000, immutable', path);
+  for (const path of ['/', '/index.html', '/calendar.html', '/app.css', '/app.css?v=20261019-old', '/calendar-view.mjs?v=0123456789', '/schedule-common.mjs']) assert.equal(await cacheFor(path), 'no-cache', path);
+  const page = await workerModule.default.fetch(new Request('https://example.test/app.css?v=0123456789'), env);
+  assert.equal(page.headers.get('etag'), '"abc"');
+  assert.match(page.headers.get('content-security-policy'), /default-src 'self'/);
+});
+
+test('every page references the current content hash of its versioned CSS and JS', async () => {
+  const { versionedAssets, pages, assetHash, assetReference } = await import('./scripts/stamp-assets.mjs');
+  for (const page of pages) {
+    const html = await readFile(new URL(`./${page}`, import.meta.url), 'utf8');
+    for (const file of versionedAssets) {
+      for (const [reference] of html.matchAll(assetReference(file))) {
+        assert.equal(reference.slice(1), `${file}?v=${assetHash(file)}`, `${page} has a stale ?v= for ${file}; run npm run stamp`);
+      }
+    }
+    assert.ok(versionedAssets.some(file => assetReference(file).test(html)), `${page} references no versioned assets`);
+  }
+});
+
 test('calendar write route remains available behind the shared security wrapper', async () => {
   let forwarded = false;
   const env = { CALENDARS: { idFromName: name => name, get: () => ({ fetch: async () => { forwarded = true; return Response.json({ id: 'saved' }, { status: 201 }); } }) } };

@@ -21,3 +21,7 @@ new_sqlite_classes = ["CalendarStore"]
 
 [vars]
 # Configure the token with: wrangler secret put FOOTBALL_DATA_API_KEY
+
+# Workers Logs: request logs and errors in the Cloudflare dashboard (included on the free plan).
+[observability]
+enabled = true

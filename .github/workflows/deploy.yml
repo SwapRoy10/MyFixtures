@@ -7,9 +7,17 @@ on:
       - development
   workflow_dispatch:
 
+# One deploy per branch at a time. A newer push waits for the running deploy instead of
+# interrupting it halfway through a Cloudflare upload.
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # Normal runs take under a minute; fail fast instead of hanging for GitHub's 6-hour default.
+    timeout-minutes: 10
     permissions:
       contents: read
     defaults:
@@ -29,6 +37,7 @@ jobs:
           cache-dependency-path: MyFixturesApp/package-lock.json
 
       - name: Install dependencies
+        timeout-minutes: 4
         run: npm ci
 
       - name: Run regression tests
