@@ -17,7 +17,8 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    # Six sports 65s apart, plus up to two retries per sport on provider rate limits.
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: MyFixturesApp
