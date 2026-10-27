@@ -57,6 +57,19 @@ test('Page titles stay fixed: MyFixtures, and MyFixtures | Personal Calendar on 
   assert.doesNotMatch(await readFile(new URL('./calendar-ui.mjs', import.meta.url), 'utf8'), /document\.title\s*=/);
 });
 
+test('Both pages carry link-preview tags pointing at a real 1200x627 PNG', async () => {
+  const png = await readFile(new URL('./og-image.png', import.meta.url));
+  assert.equal(png.subarray(1, 4).toString(), 'PNG');
+  assert.equal(png.readUInt32BE(16), 1200);
+  assert.equal(png.readUInt32BE(20), 627);
+  for (const name of ['index.html', 'calendar.html']) {
+    const html = await readFile(new URL(`./${name}`, import.meta.url), 'utf8');
+    for (const tag of ['og:title', 'og:description', 'og:url', 'og:image']) assert.match(html, new RegExp(`<meta property="${tag}" content="[^"]+">`), `${name} ${tag}`);
+    assert.match(html, /<meta property="og:image" content="https:\/\/my-fixtures-api\.sorp\.workers\.dev\/og-image\.png">/);
+    assert.match(html, /<meta name="description" content="[^"]+">/);
+  }
+});
+
 test('The fold opens by itself when a season has no upcoming games left', async () => {
   const { context, element } = loadApp([fixture('past-1', '2000-08-10T14:00:00Z')]);
   await vm.runInContext('loadLiveFixtures()', context);

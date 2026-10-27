@@ -13,7 +13,7 @@ const providerScheduleCacheTtl = 60 * 60;
 const publicAssetPaths = new Set([
   '/', '/index.html', '/calendar', '/calendar.html', '/app.js', '/calendar-ui.mjs',
   '/calendar-view.mjs', '/calendar-guides.mjs', '/schedule-common.mjs',
-  '/app.css', '/favicon.svg'
+  '/app.css', '/favicon.svg', '/og-image.png'
 ]);
 const footballCompetitionCodes = ['PL', 'CL', 'EL', 'FAC', 'FLC', 'ELC', 'SA', 'PPL', 'DED', 'PD', 'CDR', 'BL1', 'DFB', 'FL1'];
 const footballRosterCompetitionCodes = ['PL', 'CL', 'ELC', 'SA', 'PPL', 'DED', 'PD', 'BL1', 'FL1'];

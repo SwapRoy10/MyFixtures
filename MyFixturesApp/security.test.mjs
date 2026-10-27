@@ -24,7 +24,7 @@ test('HTTPS redirect and security headers cover static pages and API errors', as
 test('only declared public assets can be fetched from the asset binding', async () => {
   let assetFetches = 0;
   const env = { ASSETS: { fetch: async () => { assetFetches++; return new Response('asset'); } } };
-  const publicPaths = ['/', '/index.html', '/calendar', '/calendar.html', '/app.js', '/calendar-ui.mjs', '/calendar-view.mjs', '/calendar-guides.mjs', '/schedule-common.mjs', '/app.css', '/favicon.svg'];
+  const publicPaths = ['/', '/index.html', '/calendar', '/calendar.html', '/app.js', '/calendar-ui.mjs', '/calendar-view.mjs', '/calendar-guides.mjs', '/schedule-common.mjs', '/app.css', '/favicon.svg', '/og-image.png'];
   for (const path of publicPaths) assert.equal((await workerModule.default.fetch(new Request(`https://example.test${path}`), env)).status, 200, path);
   for (const path of ['/.gitignore', '/.dev.vars', '/package.json', '/worker.js', '/.wrangler/security-dry-run/worker.js.map']) {
     assert.equal((await workerModule.default.fetch(new Request(`https://example.test${path}`), env)).status, 404, path);
