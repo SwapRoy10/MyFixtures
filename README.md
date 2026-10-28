@@ -37,7 +37,7 @@ MyFixtures is a responsive sports schedule website for following soccer clubs, N
 - NFL schedules prefer ESPN and use [BALLDONTLIE](https://www.balldontlie.io/) as a fallback.
 - NBA schedules use [BALLDONTLIE's free Teams and Games endpoints](https://docs.balldontlie.io/), with ESPN supplying matched venue details. Seasons span July through June; unpublished Cup and playoff matchups are added when available.
 - MLB team and game data comes from [BALLDONTLIE MLB](https://mlb.balldontlie.io/). Only games scheduled from the current day forward are shown; determined postseason games are included automatically.
-- Formula 1 schedules prefer [Jolpica F1](https://github.com/jolpica/jolpica-f1) and use BALLDONTLIE as a fallback.
+- Formula 1 schedules come from the free [Jolpica F1](https://github.com/jolpica/jolpica-f1) feed.
 
 ## Technology
 
@@ -52,7 +52,7 @@ Requirements:
 
 - Node.js 24
 - A [football-data.org](https://www.football-data.org/client/register) API token for soccer data
-- A BALLDONTLIE API key for MLB/NBA data and optional fallback NFL and Formula 1 data
+- A BALLDONTLIE API key for MLB/NBA data and the optional NFL fallback
 
 From the application directory:
 
