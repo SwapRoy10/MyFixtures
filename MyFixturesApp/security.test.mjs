@@ -4,7 +4,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 const workerSource = await readFile(new URL('./worker.js', import.meta.url), 'utf8');
-const workerModule = await import(`data:text/javascript;base64,${Buffer.from(workerSource.replace("'./living-calendar.mjs'", JSON.stringify(new URL('./living-calendar.mjs', import.meta.url).href)) + '\nexport { withApiCache, getNbaPages, getMlbPages, getF1Pages };').toString('base64')}`);
+const workerModule = await import(`data:text/javascript;base64,${Buffer.from(workerSource.replace("'./living-calendar.mjs'", JSON.stringify(new URL('./living-calendar.mjs', import.meta.url).href)) + '\nexport { withApiCache, getNbaPages, getMlbPages };').toString('base64')}`);
 
 test('HTTPS redirect and security headers cover static pages and API errors', async () => {
   const worker = workerModule.default;
@@ -80,8 +80,7 @@ test('provider pagination has a finite page budget', async () => {
   const env = { BALLDONTLIE_API_KEY: 'test-only' };
   for (const [loader, args] of [
     [workerModule.getNbaPages, ['games', new URLSearchParams(), env]],
-    [workerModule.getMlbPages, [new URLSearchParams(), env]],
-    [workerModule.getF1Pages, ['events', new URLSearchParams(), env]]
+    [workerModule.getMlbPages, [new URLSearchParams(), env]]
   ]) {
     page = 0;
     await assert.rejects(loader(...args), /too many pages/);

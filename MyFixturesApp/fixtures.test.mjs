@@ -156,25 +156,6 @@ test('NFL keeps completed games and can use ESPN without a BALLDONTLIE key', asy
   assert.equal(body.fixtures[0].status, 'post');
 });
 
-test('F1 fallback keeps completed races while excluding canceled races', async () => {
-  const event = { id: 1, name: 'Italian Grand Prix', start_date: '2026-09-04T10:00:00Z', end_date: '2026-09-06T13:00:00Z' };
-  globalThis.fetch = async input => {
-    const url = new URL(input);
-    if (url.hostname === 'api.jolpi.ca') return new Response('Unavailable', { status: 502 });
-    if (url.pathname.endsWith('/events')) return Response.json({ data: [event], meta: {} });
-    return Response.json({ data: [
-      { id: 10, event, type: 'Race', date: '2026-09-06T13:00:00Z', status_state: 'completed' },
-      { id: 11, event, type: 'Race', date: '2026-09-06T13:00:00Z', status_state: 'canceled' }
-    ], meta: {} });
-  };
-
-  const response = await worker.fetch(new Request('https://example.test/api/fixtures?sport=f1&dateFrom=2026-01-01&dateTo=2026-12-31'), { BALLDONTLIE_API_KEY: 'test-key' });
-  const body = await response.json();
-  assert.equal(response.status, 200);
-  assert.equal(body.results, 1);
-  assert.equal(body.fixtures[0].status, 'completed');
-});
-
 test('MLB team search returns matching clubs with baseball logos', async () => {
   globalThis.fetch = async (input, options) => {
     const url = new URL(input);

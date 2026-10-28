@@ -844,35 +844,6 @@ async function getMlbFixtures(url, env, options = {}) {
   }
 }
 
-async function getF1Pages(endpoint, query, env) {
-  const rows = [];
-  const cursors = new Set();
-  let pages = 0;
-  query.set('per_page', '100');
-  while (true) {
-    if (++pages > 25) throw new Error('F1 schedule provider returned too many pages.');
-    const result = await fetchProviderJson(`https://api.balldontlie.io/f1/v1/${endpoint}?${query}`, { Authorization: env.BALLDONTLIE_API_KEY }, providerScheduleCacheTtl);
-    if (!result.ok) {
-      const providerMessage = result.payload?.message || result.payload?.error;
-      const error = new Error(result.status === 401 || result.status === 403
-        ? 'F1 access denied. Check BALLDONTLIE_API_KEY and F1 ALL-STAR or GOAT access for session times.'
-        : result.status === 429
-          ? 'BALLDONTLIE F1 rate limit reached. Please try again shortly.'
-          : `BALLDONTLIE F1 schedule request failed (${result.status})${providerMessage ? `: ${providerMessage}` : '.'}`);
-      error.status = result.status >= 400 && result.status <= 599 ? result.status : 502;
-      throw error;
-    }
-    if (!Array.isArray(result.payload.data)) throw new Error('Invalid F1 schedule response.');
-    if (rows.length + result.payload.data.length > 2500) throw new Error('F1 schedule provider returned too many records.');
-    rows.push(...result.payload.data);
-    const cursor = result.payload.meta?.next_cursor;
-    if (cursor == null) return rows;
-    if (cursors.has(String(cursor))) throw new Error('Invalid F1 pagination response.');
-    cursors.add(String(cursor));
-    query.set('cursor', String(cursor));
-  }
-}
-
 async function getJolpicaF1Fixtures(dateFrom, dateTo) {
   const seasons = [...new Set([dateFrom.slice(0, 4), dateTo.slice(0, 4)])];
   const responses = await Promise.all(seasons.map(season => fetch(`https://api.jolpi.ca/ergast/f1/${season}/races/?limit=100`, {
@@ -905,13 +876,6 @@ async function getJolpicaF1Fixtures(dateFrom, dateTo) {
     .sort((a, b) => a.utcDate.localeCompare(b.utcDate));
 }
 
-function f1SessionType(value) {
-  const type = String(value || '').toLowerCase().replace(/[^a-z]/g, '');
-  return { race: 'race', qualifying: 'qualifying', sprint: 'sprint', sprintrace: 'sprint', sprintqualifying: 'sprint-qualifying', sprintshootout: 'sprint-qualifying' }[type];
-}
-
-const f1SessionLabel = { race: 'Race', qualifying: 'Qualifying', sprint: 'Sprint', 'sprint-qualifying': 'Sprint Qualifying' };
-
 async function getF1Fixtures(url, env) {
   const year = new Date().getUTCFullYear();
   const dateFrom = url.searchParams.get('dateFrom') || `${year}-01-01`;
@@ -923,32 +887,10 @@ async function getF1Fixtures(url, env) {
   try {
     const jolpicaFixtures = await getJolpicaF1Fixtures(dateFrom, dateTo);
     return new Response(JSON.stringify({ fixtures: jolpicaFixtures, results: jolpicaFixtures.length, provider: 'jolpica' }), { headers: jsonHeaders });
-  } catch (jolpicaError) {
-    if (!env.BALLDONTLIE_API_KEY) return errorResponse(`Free F1 schedule is unavailable: ${jolpicaError.message}`, 503);
-  }
-  try {
-    const events = [];
-    for (let season = Number(dateFrom.slice(0, 4)); season <= Number(dateTo.slice(0, 4)); season += 1) {
-      events.push(...await getF1Pages('events', new URLSearchParams({ season: String(season) }), env));
-    }
-    const excluded = new Set(['canceled', 'cancelled', 'abandoned']);
-    // The event status describes the whole race weekend. Keep completed race
-    // sessions so the calendar remains a complete season record.
-    const upcoming = events.filter(event => event.start_date?.slice(0, 10) <= dateTo && (event.end_date || event.start_date)?.slice(0, 10) >= dateFrom);
-    const sessions = [];
-    for (let offset = 0; offset < upcoming.length; offset += 20) {
-      const query = new URLSearchParams();
-      upcoming.slice(offset, offset + 20).forEach(event => query.append('event_ids[]', String(event.id)));
-      sessions.push(...await getF1Pages('sessions', query, env));
-    }
-    const fixtures = [...new Map(sessions.filter(session => f1SessionType(session.type) && session.date && Number.isFinite(Date.parse(session.date)) && session.date.slice(0, 10) >= dateFrom && session.date.slice(0, 10) <= dateTo && !excluded.has(String(session.status_state || session.status).toLowerCase())).map(session => {
-      const event = session.event || upcoming.find(event => event.id === session.event_id) || {};
-      const sessionType = f1SessionType(session.type);
-      return [session.id, { id: `f1-${session.id}`, sport: 'f1', sessionType, utcDate: session.date, scheduledDate: session.date.slice(0, 10), opponent: event.name || 'Grand Prix', title: `${event.name || 'Grand Prix'} - ${f1SessionLabel[sessionType]}`, venue: event.circuit?.name || event.location || '', competition: 'Formula 1', status: session.status_state || session.status || 'unknown', provider: 'balldontlie' }];
-    })).values()].sort((a, b) => a.utcDate.localeCompare(b.utcDate));
-    return new Response(JSON.stringify({ fixtures, results: fixtures.length, provider: 'balldontlie' }), { headers: jsonHeaders });
   } catch (error) {
-    return errorResponse(error.status ? error.message : 'BALLDONTLIE F1 schedule is temporarily unavailable. Please try again later.', error.status || 502);
+    // Jolpica is the only F1 source: BALLDONTLIE's F1 data needs a paid tier.
+    // 503 lets the API cache serve the last good schedule and the audit retry.
+    return errorResponse(`Free F1 schedule is unavailable: ${error.message}`, 503);
   }
 }
 

@@ -8,7 +8,6 @@ const source = await readFile(new URL('./worker.js', import.meta.url), 'utf8').t
 const worker = (await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)).default;
 const request = (query = '') => new Request(`https://example.test/api/fixtures?sport=f1&dateFrom=2026-01-01&dateTo=2026-12-31${query}`);
 const env = { BALLDONTLIE_API_KEY: 'test-key' };
-const event = { id: 1, name: 'Italian Grand Prix', start_date: '2026-09-04T10:00:00Z', end_date: '2026-09-06T13:00:00Z', status_state: 'completed', circuit: { name: 'Monza' } };
 globalThis.caches = { default: { match: async () => undefined, put: async () => {} } };
 
 test('free Jolpica feed publishes every timed race, qualifying and sprint session', async () => {
@@ -35,62 +34,27 @@ test('free Jolpica feed publishes every timed race, qualifying and sprint sessio
   assert.deepEqual((await narrow.json()).fixtures.map(f => f.sessionType), ['sprint-qualifying', 'sprint', 'qualifying']);
 });
 
-test('BALLDONTLIE fallback paginates all supported sessions without practice or canceled entries', async () => {
-  const calls = [];
-  globalThis.fetch = async (input, options) => {
-    const url = new URL(input);
-    calls.push(url);
-    if (url.hostname === 'api.jolpi.ca') return new Response('Unavailable', { status: 502 });
-    assert.equal(options.headers.Authorization, 'test-key');
-    if (url.pathname.endsWith('/events')) {
-      assert.equal(url.searchParams.get('season'), '2026');
-      return Response.json({ data: [event], meta: {} });
-    }
-    assert.equal(url.searchParams.has('type'), false);
-    assert.deepEqual(url.searchParams.getAll('event_ids[]'), ['1']);
-    const race = { id: 10, event, type: 'Race', date: '2026-09-06T13:00:00Z', status_state: 'scheduled' };
-    return Response.json(url.searchParams.has('cursor') ? { data: [
-      { ...race, id: 11, type: 'Sprint', date: '2026-09-05T09:00:00Z' },
-      { ...race, id: 12, type: 'Qualifying', date: '2026-09-05T13:00:00Z' },
-      { ...race, id: 13, type: 'Sprint Qualifying', date: '2026-09-04T12:30:00Z' },
-      { ...race, id: 14, type: 'Practice', date: '2026-09-04T10:00:00Z' },
-      { ...race, id: 15, status_state: 'canceled' },
-      { ...race, id: 16, date: '2027-01-01T12:00:00Z' }
-    ], meta: {} } : { data: [race], meta: { next_cursor: 10 } });
-  };
+test('a Jolpica outage names the cause and never falls back to BALLDONTLIE, even with a key', async () => {
+  const hosts = [];
+  globalThis.fetch = async input => { hosts.push(new URL(input).hostname); return new Response('Unavailable', { status: 502 }); };
   const response = await worker.fetch(request(), env);
-  assert.equal(response.status, 200);
-  const body = await response.json();
-  assert.equal(body.results, 4);
-  assert.deepEqual(body.fixtures.map(f => f.sessionType), ['sprint-qualifying', 'sprint', 'qualifying', 'race']);
-  assert.equal(body.fixtures[0].title, 'Italian Grand Prix - Sprint Qualifying');
-  assert.equal(body.fixtures[0].venue, 'Monza');
-  assert.equal(calls.length, 4);
+  assert.equal(response.status, 503);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.match((await response.json()).error, /Free F1 schedule is unavailable: Jolpica F1 returned 502/);
+  assert.deepEqual([...new Set(hosts)], ['api.jolpi.ca']);
 });
 
-test('missing key and invalid date ranges fail before provider requests', async () => {
+test('a malformed Jolpica response is an outage, not an empty schedule', async () => {
+  globalThis.fetch = async () => Response.json({ MRData: {} });
+  const response = await worker.fetch(request(), env);
+  assert.equal(response.status, 503);
+  assert.match((await response.json()).error, /invalid F1 schedule response/);
+});
+
+test('invalid date ranges fail before provider requests', async () => {
   globalThis.fetch = async () => { throw new Error('Must not fetch'); };
-  assert.equal((await worker.fetch(request(), {})).status, 503);
   assert.equal((await worker.fetch(new Request('https://example.test/api/fixtures?sport=f1&dateFrom=2026-02-30'), env)).status, 400);
-});
-
-test('empty season never issues an unfiltered sessions request', async () => {
-  globalThis.fetch = async input => {
-    if (String(input).includes('api.jolpi.ca')) return new Response('Unavailable', { status: 502 });
-    assert.ok(input.includes('/events?'));
-    return Response.json({ data: [], meta: {} });
-  };
-  assert.equal((await (await worker.fetch(request(), env)).json()).results, 0);
-});
-
-test('access errors and non-JSON outages are not cached as empty schedules', async () => {
-  globalThis.fetch = async input => String(input).includes('api.jolpi.ca') ? new Response('Unavailable', { status: 502 }) : Response.json({ error: 'Unauthorized' }, { status: 401 });
-  const denied = await worker.fetch(request(), env);
-  assert.equal(denied.status, 401);
-  assert.equal(denied.headers.get('cache-control'), 'no-store');
-  assert.match((await denied.json()).error, /ALL-STAR/);
-  globalThis.fetch = async () => new Response('Unavailable', { status: 502 });
-  assert.equal((await worker.fetch(request(), env)).status, 502);
+  assert.equal((await worker.fetch(new Request('https://example.test/api/fixtures?sport=f1&dateFrom=2026-01-01&dateTo=2028-01-01'), env)).status, 400);
 });
 
 test('F1 session lengths distinguish races, qualifying and sprint events', () => {
