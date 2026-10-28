@@ -51,6 +51,31 @@ test('a malformed Jolpica response is an outage, not an empty schedule', async (
   assert.match((await response.json()).error, /invalid F1 schedule response/);
 });
 
+test('Jolpica responses are cached per season and shared across date ranges', async () => {
+  const store = new Map();
+  globalThis.caches = { default: { match: async key => store.get(key.url)?.clone(), put: async (key, response) => { store.set(key.url, response); } } };
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls += 1;
+    return Response.json({ MRData: { RaceTable: { Races: [{ season: '2026', round: '1', raceName: 'Australian Grand Prix', date: '2026-03-08', time: '04:00:00Z' }] } } });
+  };
+  try {
+    for (const range of ['dateFrom=2026-01-01&dateTo=2026-12-31', 'dateFrom=2026-03-01&dateTo=2026-03-31']) {
+      const response = await worker.fetch(new Request(`https://example.test/api/fixtures?sport=f1&${range}`), {});
+      assert.equal((await response.json()).results, 1);
+    }
+    assert.equal(calls, 1);
+    globalThis.fetch = async () => new Response('Too Many Requests', { status: 429 });
+    store.clear();
+    const limited = await worker.fetch(request(), {});
+    assert.equal(limited.status, 503);
+    assert.match((await limited.json()).error, /Jolpica F1 returned 429/);
+    assert.equal([...store.keys()].some(key => key.includes('api.jolpi.ca')), false);
+  } finally {
+    globalThis.caches = { default: { match: async () => undefined, put: async () => {} } };
+  }
+});
+
 test('invalid date ranges fail before provider requests', async () => {
   globalThis.fetch = async () => { throw new Error('Must not fetch'); };
   assert.equal((await worker.fetch(new Request('https://example.test/api/fixtures?sport=f1&dateFrom=2026-02-30'), env)).status, 400);

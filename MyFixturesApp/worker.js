@@ -846,13 +846,14 @@ async function getMlbFixtures(url, env, options = {}) {
 
 async function getJolpicaF1Fixtures(dateFrom, dateTo) {
   const seasons = [...new Set([dateFrom.slice(0, 4), dateTo.slice(0, 4)])];
-  const responses = await Promise.all(seasons.map(season => fetch(`https://api.jolpi.ca/ergast/f1/${season}/races/?limit=100`, {
-    headers: { 'User-Agent': 'MyFixtures/1.0' }, signal: AbortSignal.timeout(20000)
-  })));
-  const payloads = await Promise.all(responses.map(async response => {
-    if (!response.ok) throw new Error(`Jolpica F1 returned ${response.status}`);
-    return response.json();
-  }));
+  // Cached per season for an hour, shared by every requested date range. Jolpica
+  // rate-limits by IP and Cloudflare Workers share IPs, so uncached calls hit 429s.
+  const results = await Promise.all(seasons.map(season => fetchProviderJson(
+    `https://api.jolpi.ca/ergast/f1/${season}/races/?limit=100`, { 'User-Agent': 'MyFixtures/1.0' }, providerScheduleCacheTtl)));
+  const payloads = results.map(result => {
+    if (!result.ok) throw new Error(result.status >= 400 ? `Jolpica F1 returned ${result.status}` : 'Jolpica returned an invalid F1 schedule response');
+    return result.payload;
+  });
   if (payloads.some(payload => !payload.MRData?.RaceTable || !Array.isArray(payload.MRData.RaceTable.Races))) {
     throw new Error('Jolpica returned an invalid F1 schedule response');
   }
